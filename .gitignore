@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+
+# 가상환경
+venv/
+.env
+*.env
+
+# 로그 및 캐시
+*.log
+*.sqlite3
+*.db
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+
+# VSCode
+.vscode/
+
+# summarizer_pipeline 내부 민감/임시 파일
+summarizer_pipeline/.env
+summarizer_pipeline/data/latest_issues.json
+summarizer_pipeline/db/chroma/
