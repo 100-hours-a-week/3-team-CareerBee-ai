@@ -32,10 +32,14 @@ jobs:
 
       - name: Upload AI source to GCS
         run: |
-          mkdir -p ./deploy-ai
-          cp -r main.py app requirements.txt .env ./deploy-ai/
-          echo "Uploading to: ${{ secrets.GCS_PROD_BUCKET_PATH }}/ai/$DEPLOY_PATH"
-          gcloud storage cp -r ./deploy-ai/* "${{ secrets.GCS_PROD_BUCKET_PATH }}/ai/$DEPLOY_PATH/"
+              mkdir -p ./deploy-ai
+              cp ./fastapi_project/main.py ./deploy-ai/
+              cp ./fastapi_project/requirements.txt ./deploy-ai/
+              cp ./.env ./deploy-ai/
+              cp -r ./fastapi_project/app ./deploy-ai/app
+          
+              echo "Uploading to: ${{ secrets.GCS_DEV_BUCKET_PATH }}/ai/$DEPLOY_PATH"
+              gcloud storage cp -r ./deploy-ai/* "${{ secrets.GCS_DEV_BUCKET_PATH }}/ai/$DEPLOY_PATH/"
 
       - name: Setup SSH key
         run: |
