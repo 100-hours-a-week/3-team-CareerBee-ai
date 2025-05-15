@@ -1,0 +1,9 @@
+fastapi>=0.110.0
+uvicorn>=0.27.0
+python-docx
+openai
+langchain>=0.1.17
+langchain-community>=0.0.12
+langchain-core>=0.1.31
+tiktoken
+python-dotenv>=1.0.1
