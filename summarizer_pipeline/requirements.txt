@@ -9,6 +9,7 @@ cryptography==44.0.3
 # --- LLM 벡터 저장 및 검색 ---
 chromadb==0.4.24
 sentence-transformers==2.2.2
+huggingface_hub==0.14.1
 
 # --- LangChain (Chroma, Embedding Wrapper) ---
 langchain==0.1.14
