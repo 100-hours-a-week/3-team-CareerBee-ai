@@ -30,6 +30,11 @@ jobs:
           TIMESTAMP=$(TZ='Asia/Seoul' date +%Y-%m-%d_%H_%M_%S)
           echo "DEPLOY_PATH=${TIMESTAMP}_${COMMIT_HASH}" >> $GITHUB_ENV
 
+    
+      - name: Create .env file
+        run: |
+            echo "${{ secrets.ENV_FILE_CONTENTS }}" > .env
+
       - name: Upload AI source to GCS
         run: |
               mkdir -p ./deploy-ai
