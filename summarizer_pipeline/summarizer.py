@@ -12,8 +12,9 @@ embedding_function = SentenceTransformerEmbeddings(
 
 # 2️⃣ ChromaDB 연결
 chroma = Chroma(
-    persist_directory="db/chroma",
-    embedding_function=embedding_function
+    collection_name="company_issues",
+    embedding_function=embedding_function,
+    persist_directory="db/chroma"  # 기존 경로와 다른 새 디렉토리 지정
 )
 
 # 3️⃣ vLLM 서버 호출 함수
@@ -26,7 +27,7 @@ def call_vllm(prompt: str) -> str:
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.3,
-        "max_tokens": 1024
+        "max_tokens": 1800
     }
     resp = requests.post(url, headers=headers, json=payload)
     resp.raise_for_status()
@@ -35,14 +36,16 @@ def call_vllm(prompt: str) -> str:
 # 4️⃣ 프롬프트 생성 함수 (공시 중심 요약 지시 포함)
 def make_prompt(corp_name: str, context: str) -> str:
     return (
-        f"[역할] 너는 취업준비생을 돕는 기업 이슈 분석 AI야.\n"
-        f"[목표] 아래는 {corp_name}의 뉴스 및 공시 정보야. "
+        f"[역할] 너는 취업 준비생을 위한 기업 이슈 요약 AI야.\n"
+        f"[목표] 아래는 {corp_name}의 공시 및 뉴스 정보야. "
+        f"이 정보를 바탕으로 해당 기업의 '최근 이슈'를 단 하나의 문단으로 간결하게 요약해줘.\n"
         f"특히 공시는 기업이 직접 작성한 공식 문서이기 때문에 내용을 우선 반영하고, "
         f"뉴스는 보조적으로 활용해줘.\n"
-        f"[조건] 항목별 나열 없이, 하나의 자연스러운 문단으로 요약해주고 반드시 한국어로 작성해줘. "
-        f"공시 내용을 중심으로 요약의 흐름을 만들어줘.\n"
-        f"[형식] 모든 문장은 무조건 '~했습니다' 또는 '~하였습니다' 형태로 끝맺어줘."
-        f"말투는 일관되게 과거형 서술형으로 유지해주고, 서론-중간-결론이 자연스럽게 이어지도록 500자 이내로 작성해줘.\n\n"
+        f"[조건]\n"
+        f"- 다른 기업이나 해당 기업과 관련되지 않은 내용은 절대 포함하지 마.\n"
+        f"- 항목 나열이나 번호 형식 없이, 하나의 단락으로 자연스럽게 써줘.\n"
+        f"- 반드시 기업 {corp_name} 과 직접적으로 관련된 내용만 포함해야 해.\n"
+        f"- 모든 한국어로 출력해주고, 문장은 '~하였습니다.' 또는 '~했습니다.'. '~됩니다', '~합니다'등으로 끝내줘. 전체 글은 500자 이내로 유지해줘.\n\n"
         f"[본문]\n{context}"
     )
 
@@ -54,10 +57,10 @@ def generate_latest_issue(corp_name: str, return_docs: bool = False):
     all_data = chroma.get(include=["metadatas", "documents"])
     report_doc_obj = None
     for meta, doc in zip(all_data['metadatas'], all_data['documents']):
-        if meta.get("corp") == corp_name and meta.get("type") == "공시":
+        if meta.get("corp") == corp_name and meta.get("type") == "report":
             report_doc_obj = Document(
                 page_content=doc,
-                metadata={"type": "공시", "corp": corp_name}
+                metadata={"type": "report", "corp": corp_name}
             )
             break
 
@@ -66,11 +69,11 @@ def generate_latest_issue(corp_name: str, return_docs: bool = False):
     for q in queries:
         result = chroma.similarity_search(
             q,
-            k=5,
+            k=3,
             filter={
                 "$and": [
                     {"corp": {"$eq": corp_name}},
-                    {"type": {"$eq": "뉴스"}}
+                    {"type": {"$eq": "news"}}
                 ]
             }
         )
@@ -84,9 +87,10 @@ def generate_latest_issue(corp_name: str, return_docs: bool = False):
             unique_news_docs.append(doc)
             seen.add(doc.page_content)
 
-    # 아무 것도 없으면 종료
-    if report_doc_obj is None and not unique_news_docs:
-        return (f"{corp_name} 관련 뉴스나 공시를 찾지 못했습니다.", []) if return_docs else f"{corp_name} 관련 뉴스나 공시를 찾지 못했습니다."
+		# 아무 것도 없으면 종료
+        if report_doc_obj is None and not unique_news_docs:
+            msg = f"최근 이슈가 없어요. {corp_name}는 평화롭군요."
+            return (msg, []) if return_docs else msg
 
     # 6️⃣ context 구성
     context_parts = []
@@ -97,7 +101,11 @@ def generate_latest_issue(corp_name: str, return_docs: bool = False):
         used_docs.append(report_doc_obj)
 
     if unique_news_docs:
-        context_parts.append("[뉴스 정보]\n" + "\n\n".join(doc.page_content for doc in unique_news_docs))
+        formatted_news = []
+        for doc in unique_news_docs:
+            date = doc.metadata.get("date", "날짜미상")
+            formatted_news.append(f"[{date}] {doc.page_content}")
+        context_parts.append("[뉴스 정보]\n" + "\n\n".join(formatted_news))
         used_docs.extend(unique_news_docs)
 
     context = "\n\n".join(context_parts)

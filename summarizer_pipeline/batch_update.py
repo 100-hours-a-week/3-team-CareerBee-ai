@@ -21,4 +21,4 @@ def update_issues_in_batches(batch_size=10):
             except Exception as e:
                 print(f"{corp} 업데이트 실패: {e}")
 
-        time.sleep(1)  # 과도한 부하 방지용 sleep (선택)
+        time.sleep(1) 

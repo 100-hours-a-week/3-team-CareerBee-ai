@@ -1,26 +1,28 @@
-# --- 크롤링 관련 ---
-requests==2.31.0
-beautifulsoup4==4.12.3
+# requirements.txt
 
-# --- DB (MySQL) 관련 ---
-pymysql==1.1.0
-cryptography==44.0.3
+# --- vLLM 및 모델 실행 ---
+vllm==0.8.5.post1
+transformers==4.39.3
+huggingface_hub==0.23.1
+tokenizers==0.15.1
 
-# --- LLM 벡터 저장 및 검색 ---
+# --- 문장 임베딩 및 RAG ---
+sentence-transformers==2.6.1
 chromadb==0.4.24
-sentence-transformers==2.2.2
-huggingface_hub==0.14.1
 
-# --- LangChain (Chroma, Embedding Wrapper) ---
+# --- LangChain (선택적, 벡터 검색 등) ---
 langchain==0.1.14
 langchain-community==0.0.32
 langchain-core==0.1.43
 
-# --- pandas (CSV 처리 등) ---
+# --- DB 연동 및 CSV 처리 ---
+pymysql==1.1.0
+cryptography==44.0.3
 pandas==2.2.2
 
-# --- dotenv (.env 로드) ---
+# --- .env 파일 로드 ---
 python-dotenv==1.0.1
 
-# --- vLLM (OpenAI-compatible LLM inference engine) ---
-vllm==0.8.5.post1
+# --- 크롤링용 ---
+requests==2.31.0
+beautifulsoup4==4.12.3
