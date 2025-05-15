@@ -20,9 +20,9 @@ def update_issue_for_company(corp_name, summary_text):
     try:
         with conn.cursor() as cursor:
             sql = """
-                UPDATE 회사
-                SET 최근이슈 = %s
-                WHERE 회사명 = %s
+                UPDATE company
+                SET recent_issue = %s
+                WHERE name = %s
             """
             cursor.execute(sql, (summary_text, corp_name))
         conn.commit()
