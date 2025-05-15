@@ -42,8 +42,8 @@ jobs:
               cp ./.env ./deploy-ai/
               cp -r ./fastapi_project/app ./deploy-ai/app
           
-              echo "Uploading to: ${{ secrets.GCS_DEV_BUCKET_PATH }}/ai/$DEPLOY_PATH"
-              gcloud storage cp -r ./deploy-ai/* "${{ secrets.GCS_DEV_BUCKET_PATH }}/ai/$DEPLOY_PATH/"
+              echo "Uploading to: ${{ secrets.GCS_PROD_BUCKET_PATH }}/ai/$DEPLOY_PATH"
+              gcloud storage cp -r ./deploy-ai/* "${{ secrets.GCS_PROD_BUCKET_PATH }}/ai/$DEPLOY_PATH/"
 
       - name: Setup SSH key
         run: |
