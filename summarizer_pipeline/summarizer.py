@@ -14,7 +14,7 @@ embedding_function = SentenceTransformerEmbeddings(
 chroma = Chroma(
     collection_name="company_issues",
     embedding_function=embedding_function,
-    persist_directory="db/chroma"  # 기존 경로와 다른 새 디렉토리 지정
+    persist_directory="db/chroma"
 )
 
 # 3️⃣ vLLM 서버 호출 함수
@@ -37,15 +37,13 @@ def call_vllm(prompt: str) -> str:
 def make_prompt(corp_name: str, context: str) -> str:
     return (
         f"[역할] 너는 취업 준비생을 위한 기업 이슈 요약 AI야.\n"
-        f"[목표] 아래는 {corp_name}의 공시 및 뉴스 정보야. "
-        f"이 정보를 바탕으로 해당 기업의 '최근 이슈'를 단 하나의 문단으로 간결하게 요약해줘.\n"
-        f"특히 공시는 기업이 직접 작성한 공식 문서이기 때문에 내용을 우선 반영하고, "
-        f"뉴스는 보조적으로 활용해줘.\n"
+        f"[목표] 아래는 {corp_name}의 공시 및 뉴스 정보야. 이 정보를 바탕으로 해당 기업의 최근 이슈를 단 하나의 문단으로, 취업 준비생이 이해하기 쉽게 요약해줘.\n"
+        f"[중요] 공시 내용은 기업이 작성한 공식 문서이므로 반드시 요약에 포함하고, 뉴스는 공시를 보완하는 수준에서 간결히 포함해줘.\n"
         f"[조건]\n"
-        f"- 다른 기업이나 해당 기업과 관련되지 않은 내용은 절대 포함하지 마.\n"
-        f"- 항목 나열이나 번호 형식 없이, 하나의 단락으로 자연스럽게 써줘.\n"
-        f"- 반드시 기업 {corp_name} 과 직접적으로 관련된 내용만 포함해야 해.\n"
-        f"- 모든 한국어로 출력해주고, 문장은 '~하였습니다.' 또는 '~했습니다.'. '~됩니다', '~합니다'등으로 끝내줘. 전체 글은 500자 이내로 유지해줘.\n\n"
+        f"- 반드시 한국어로 작성하고, 모든 문장은 '~입니다', '~하였습니다' 등 정중한 문어체로 통일해주세요.\n"
+        f"- 항목 나열이나 번호 형식 없이, 하나의 자연스러운 단락으로 작성해주세요.\n"
+        f"- 다른 기업이나 관련 없는 내용은 절대 포함하지 말고, 반드시 {corp_name}과 직접 관련된 내용만 포함해주세요.\n"
+        f"- 전체 문장은 500자 이내로 유지해주세요.\n"
         f"[본문]\n{context}"
     )
 
@@ -87,10 +85,10 @@ def generate_latest_issue(corp_name: str, return_docs: bool = False):
             unique_news_docs.append(doc)
             seen.add(doc.page_content)
 
-		# 아무 것도 없으면 종료
-        if report_doc_obj is None and not unique_news_docs:
-            msg = f"최근 이슈가 없어요. {corp_name}는 평화롭군요."
-            return (msg, []) if return_docs else msg
+    # 아무 것도 없으면 종료
+    if report_doc_obj is None and not unique_news_docs:
+        msg = f"최근 이슈가 없어요. {corp_name}는 평화롭군요."
+        return (msg, []) if return_docs else msg
 
     # 6️⃣ context 구성
     context_parts = []
@@ -116,8 +114,7 @@ def generate_latest_issue(corp_name: str, return_docs: bool = False):
         chunks = [context[i:i+MAX_LEN] for i in range(0, len(context), MAX_LEN)]
         partial_summaries = [call_vllm(make_prompt(corp_name, chunk)) for chunk in chunks]
         final_prompt = (
-            f"[통합 요약 지시]\n아래는 {corp_name}에 대한 부분 요약이야. "
-            f"공시 내용을 중심으로 정리해줘.\n\n" + "\n\n".join(partial_summaries)
+            f"[통합 요약 지시]\n아래는 {corp_name}에 대한 부분 요약이야. 공시 내용을 중심으로 정리해줘.\n\n" + "\n\n".join(partial_summaries)
         )
         result = call_vllm(final_prompt)
     else:
