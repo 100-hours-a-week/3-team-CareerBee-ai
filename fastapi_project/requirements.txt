@@ -44,4 +44,4 @@ openai
 tiktoken
 
 # --- 데이터 검증 ---
-pydantic TN
+pydantic
