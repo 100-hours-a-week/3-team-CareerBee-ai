@@ -6,7 +6,7 @@ uvicorn==0.27.0
 vllm==0.8.5.post1
 transformers==4.51.1
 huggingface_hub>=0.30.0,<1.0.0
-tokenizers==0.15.1
+tokenizers>=0.21.1,<0.22.0
 bitsandbytes>=0.45.3
 
 # --- 문장 임베딩 및 벡터 검색 (RAG) ---
@@ -19,16 +19,16 @@ langchain-community>=0.0.36,<0.1
 langchain-core>=0.1.48,<0.2.0
 
 # --- PDF 및 이미지 텍스트 처리 ---
-PyMuPDF
-PyPDF2
-pdfplumber
-pytesseract
-pillow
-filetype
+PyMuPDF==1.22.3
+PyPDF2==3.0.1
+pdfplumber==0.11.6
+pytesseract==0.3.13
+pillow==11.2.0
+filetype==1.2.0
 
 # --- .env, 환경, 파일 처리 ---
 python-dotenv==1.0.1
-python-docx
+python-docx==1.1.2
 
 # --- 크롤링 ---
 requests==2.31.0
@@ -40,8 +40,8 @@ cryptography==44.0.3
 pandas==2.2.2
 
 # --- OpenAI ---
-openai
-tiktoken
+openai==1.25.0
+tiktoken==0.9.0
 
 # --- 데이터 검증 ---
-pydantic
+pydantic==2.11.4
