@@ -2,7 +2,7 @@
 
 # --- vLLM 및 모델 실행 ---
 vllm==0.8.5.post1
-transformers==4.39.3
+transformers==4.51.1
 huggingface_hub==0.23.1
 tokenizers==0.15.1
 
