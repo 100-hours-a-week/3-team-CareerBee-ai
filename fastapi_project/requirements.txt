@@ -5,7 +5,7 @@ uvicorn==0.27.0
 # --- 모델 및 vLLM ---
 vllm==0.8.5.post1
 transformers==4.51.1
-huggingface_hub==0.23.1
+huggingface_hub>=0.30.0,<1.0.0
 tokenizers==0.15.1
 bitsandbytes>=0.45.3
 
