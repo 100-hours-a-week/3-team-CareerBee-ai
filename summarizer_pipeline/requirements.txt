@@ -11,9 +11,9 @@ sentence-transformers==2.6.1
 chromadb==0.4.24
 
 # --- LangChain (선택적, 벡터 검색 등) ---
-langchain==0.1.14
-langchain-community==0.0.32
-langchain-core==0.1.43
+langchain==0.1.17
+langchain-community>=0.0.36,<0.1
+langchain-core>=0.1.48,<0.2.0
 
 # --- DB 연동 및 CSV 처리 ---
 pymysql==1.1.0
