@@ -1,18 +1,47 @@
+# --- API 서버 ---
 fastapi==0.110.0
 uvicorn==0.27.0
-requests
-PyMuPDF
-pytesseract
-pillow
-pydantic
+
+# --- 모델 및 vLLM ---
+vllm==0.8.5.post1
+transformers==4.51.1
+huggingface_hub==0.23.1
+tokenizers==0.15.1
+bitsandbytes>=0.45.3
+
+# --- 문장 임베딩 및 벡터 검색 (RAG) ---
+sentence-transformers==2.6.1
+chromadb==0.4.24
+
+# --- LangChain 및 구성요소 ---
 langchain==0.1.17
-langchain-community==0.0.36
-langchain-core==0.1.31
-filetype
+langchain-community>=0.0.36,<0.1
+langchain-core>=0.1.48,<0.2.0
+
+# --- PDF 및 이미지 텍스트 처리 ---
+PyMuPDF
 PyPDF2
 pdfplumber
-bitsandbytes>=0.45.3
-openai
-tiktoken
+pytesseract
+pillow
+filetype
+
+# --- .env, 환경, 파일 처리 ---
 python-dotenv==1.0.1
 python-docx
+
+# --- 크롤링 ---
+requests==2.31.0
+beautifulsoup4==4.12.3
+
+# --- DB 연동 및 CSV ---
+pymysql==1.1.0
+cryptography==44.0.3
+pandas==2.2.2
+
+# --- OpenAI ---
+openai
+tiktoken
+
+# --- 데이터 검증 ---
+pydantic TN
