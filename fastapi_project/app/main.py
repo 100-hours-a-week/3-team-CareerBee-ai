@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from app.routes import health, resume_create, resume_extract, feedback
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 app = FastAPI()
 
