@@ -2,11 +2,11 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.responses import JSONResponse
-from app.routes import health, resume_create
+from app.routes import health, resume_create, resume_extract, feedback
 from dotenv import load_dotenv
 import traceback
 
-load_dotenv()
+load_dotenv(override=True)
 app = FastAPI()
 
 
@@ -51,4 +51,6 @@ async def generic_exception_handler(request: Request, exc: Exception):
 
 
 app.include_router(resume_create.router, tags=["Resume"])
+app.include_router(resume_extract.router, prefix="/resume", tags=["Resume Extract"])
 app.include_router(health.router)
+app.include_router(feedback.router, tags=["Feedback"])
