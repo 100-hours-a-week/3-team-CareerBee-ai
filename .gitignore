@@ -2,7 +2,6 @@
 __pycache__/
 *.py[cod]
 *.pyo
-*.pyc
 *.pyd
 *.egg
 *.egg-info/
@@ -10,6 +9,7 @@ dist/
 build/
 
 # 가상환경
+.venv/
 venv/
 .env
 *.env
@@ -25,8 +25,8 @@ venv/
 
 # VSCode
 .vscode/
+.idea/
 
-# summarizer_pipeline 내부 민감/임시 파일
-summarizer_pipeline/.env
-summarizer_pipeline/data/latest_issues.json
-summarizer_pipeline/db/chroma/
+# fastapi_project 내부 민감/임시 파일
+fastapi_project/app/data/latest_issues.json
+fastapi_project/app/db/chroma/
