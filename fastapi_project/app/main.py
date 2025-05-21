@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.responses import JSONResponse
-from app.routes import health, resume_create, resume_extract, feedback, summary
+from app.routes import health, resume_create, resume_extract, feedback, update_summary
 from app.services.summary_service import run_summary_pipeline
 from apscheduler.schedulers.background import BackgroundScheduler
 from pytz import timezone
@@ -55,11 +55,11 @@ async def generic_exception_handler(request: Request, exc: Exception):
     )
 
 # 라우터 등록
-app.include_router(resume_create.router, tags=["Resume"])
-app.include_router(resume_extract.router, tags=["Resume"])
-app.include_router(health.router)
-app.include_router(feedback.router, tags=["Feedback"])
-app.include_router(summary.router, tags=["Summary"])
+app.include_router(resume_create, tags=["Resume"])
+app.include_router(resume_extract, tags=["Resume"])
+app.include_router(health)
+app.include_router(feedback, tags=["Feedback"])
+app.include_router(update_summary, tags=["Summary"])
 
 # 기본 헬스 체크
 @app.get("/")
