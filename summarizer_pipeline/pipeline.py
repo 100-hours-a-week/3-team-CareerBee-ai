@@ -25,7 +25,7 @@ def generate_issue_summaries(corp_list):
         except Exception as e:
             print(f"{corp} 처리 중 오류 발생: {e}")
 
-    # 💾 JSON 저장
-    with open("data/latest_issues.json", "w", encoding="utf-8") as f:
+    # JSON 저장
+    with open("app/data/latest_issues.json", "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
-        print("\n모든 요약 JSON 저장 완료: data/latest_issues.json")
+        print("\n모든 요약 JSON 저장 완료: app/data/latest_issues.json")

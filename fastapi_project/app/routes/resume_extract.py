@@ -5,10 +5,10 @@ from app.services.resume_extract_service import extract_resume_info
 
 router = APIRouter()
 
-@router.post("/extract", response_model=ResumeExtractResponse)
-def extract_resume(request: ResumeExtractRequest):
+@router.post("/resume/extract", response_model=ResumeExtractResponse)
+async def extract_resume(request: ResumeExtractRequest):
     try:
-        result = extract_resume_info(request.file_url)
+        result = await extract_resume_info(request.file_url)
         return ResumeExtractResponse(message="extraction_success", data=result)
     except ValueError as ve:
         raise HTTPException(status_code=500, detail={

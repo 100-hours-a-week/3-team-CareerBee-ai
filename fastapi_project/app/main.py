@@ -7,5 +7,5 @@ load_dotenv()
 app = FastAPI()
 
 app.include_router(resume_create.router, tags=["Resume"])
-app.include_router(resume_extract.router, prefix="/resume", tags=["Resume Extract"])
+app.include_router(resume_extract.router, tags=["Resume"])
 app.include_router(health.router)
