@@ -38,11 +38,15 @@ jobs:
         run: |
           mkdir -p ./deploy-ai
           cp ./fastapi_project/requirements.txt ./deploy-ai/
-          cp ./.env ./deploy-ai/
+          cp -r ./fastapi_project/scripts ./deploy-ai/scripts
+          cp ./.env ./deploy-ai/.env
           cp -r ./fastapi_project/app ./deploy-ai/app
 
           echo "Uploading to: ${{ secrets.GCS_PROD_BUCKET_PATH }}/ai/$DEPLOY_PATH"
-          gcloud storage cp -r ./deploy-ai/* "${{ secrets.GCS_PROD_BUCKET_PATH }}/ai/$DEPLOY_PATH/"
+          gcloud storage cp ./deploy-ai/.env "${{ secrets.GCS_PROD_BUCKET_PATH }}/ai/$DEPLOY_PATH/.env"
+          gcloud storage cp -r ./deploy-ai/app "${{ secrets.GCS_PROD_BUCKET_PATH }}/ai/$DEPLOY_PATH/app"
+          gcloud storage cp -r ./deploy-ai/scripts "${{ secrets.GCS_PROD_BUCKET_PATH }}/ai/$DEPLOY_PATH/scripts"
+          gcloud storage cp ./deploy-ai/requirements.txt "${{ secrets.GCS_PROD_BUCKET_PATH }}/ai/$DEPLOY_PATH/requirements.txt"
 
       - name: Setup SSH key
         run: |

@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.responses import JSONResponse
-from app.routes import health, resume_create, resume_extract, feedback, summary
+from app.routes import health, resume_create, resume_extract, feedback, update_summary
 from app.services.summary_service import run_summary_pipeline
 from apscheduler.schedulers.background import BackgroundScheduler
 from pytz import timezone
