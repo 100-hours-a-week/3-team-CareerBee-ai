@@ -59,7 +59,7 @@ app.include_router(resume_create, tags=["Resume"])
 app.include_router(resume_extract, tags=["Resume"])
 app.include_router(health)
 app.include_router(feedback, tags=["Feedback"])
-app.include_router(summary, tags=["Summary"])
+app.include_router(update_summary, tags=["Summary"])
 
 # 기본 헬스 체크
 @app.get("/")
