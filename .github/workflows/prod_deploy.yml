@@ -38,7 +38,7 @@ jobs:
         run: |
           mkdir -p ./deploy-ai
           cp ./fastapi_project/requirements.txt ./deploy-ai/
-          cp ./fastapi_project/scripts ./deploy-ai/scripts
+          cp -r ./fastapi_project/scripts ./deploy-ai/scripts
           cp ./.env ./deploy-ai/
           cp -r ./fastapi_project/app ./deploy-ai/app
 
