@@ -55,11 +55,11 @@ async def generic_exception_handler(request: Request, exc: Exception):
     )
 
 # 라우터 등록
-app.include_router(resume_create.router, tags=["Resume"])
-app.include_router(resume_extract.router, tags=["Resume"])
-app.include_router(health.router)
-app.include_router(feedback.router, tags=["Feedback"])
-app.include_router(summary.router, tags=["Summary"])
+app.include_router(resume_create, tags=["Resume"])
+app.include_router(resume_extract, tags=["Resume"])
+app.include_router(health)
+app.include_router(feedback, tags=["Feedback"])
+app.include_router(summary, tags=["Summary"])
 
 # 기본 헬스 체크
 @app.get("/")
