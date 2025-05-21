@@ -1,23 +1,18 @@
-# summarizer.py
-
 import requests
 from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import SentenceTransformerEmbeddings
 from langchain_core.documents import Document
+from langchain_community.embeddings import SentenceTransformerEmbeddings
 
-# 1️⃣ 임베딩 함수 준비
 embedding_function = SentenceTransformerEmbeddings(
     model_name="snunlp/KR-SBERT-V40K-klueNLI-augSTS"
 )
 
-# 2️⃣ ChromaDB 연결
 chroma = Chroma(
     collection_name="company_issues",
     embedding_function=embedding_function,
     persist_directory="db/chroma"
 )
 
-# 3️⃣ vLLM 서버 호출 함수
 def call_vllm(prompt: str) -> str:
     url = "http://localhost:8000/v1/chat/completions"
     headers = {"Content-Type": "application/json"}
@@ -33,7 +28,6 @@ def call_vllm(prompt: str) -> str:
     resp.raise_for_status()
     return resp.json()["choices"][0]["message"]["content"]
 
-# 4️⃣ 프롬프트 생성 함수 (공시 중심 요약 지시 포함)
 def make_prompt(corp_name: str, context: str) -> str:
     return (
         f"[역할] 너는 취업 준비생을 위한 기업 이슈 요약 AI야.\n"
@@ -47,7 +41,6 @@ def make_prompt(corp_name: str, context: str) -> str:
         f"[본문]\n{context}"
     )
 
-# 5️⃣ 최종 요약 생성 함수
 def generate_latest_issue(corp_name: str, return_docs: bool = False):
     queries = ["채용 전략", "인사 정책", "조직 개편", "미래 성장성", "시장 경쟁력"]
 

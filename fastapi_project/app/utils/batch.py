@@ -1,9 +1,9 @@
 import json
 import time
-from db_writer import update_issue_for_company
-
+from app.utils.db import update_issue_for_company
+        
 def update_issues_in_batches(batch_size=10):
-    with open("data/latest_issues.json", "r", encoding="utf-8") as f:
+    with open("app/data/latest_issues.json", "r", encoding="utf-8") as f:
         issue_data = json.load(f)
 
     items = list(issue_data.items())

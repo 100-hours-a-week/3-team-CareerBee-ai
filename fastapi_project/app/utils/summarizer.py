@@ -1,7 +1,7 @@
 import json
-from crawler_hankyung import crawl_hankyung
-from embedder import add_news_to_chroma, delete_news_by_corp
-from summarizer import generate_latest_issue
+from app.utils.crawler import crawl_hankyung
+from app.utils.chroma_handler import add_news_to_chroma, delete_news_by_corp
+from app.utils.summarizer_core import generate_latest_issue
 
 def generate_issue_summaries(corp_list):
     print("\n전체 요약 파이프라인 시작")

@@ -3,9 +3,6 @@ from bs4 import BeautifulSoup
 import time
 
 def crawl_hankyung(corp_name: str, top_k: int = 15, max_pages: int = 5):
-    """
-    한경 뉴스 사이트에서 기업명으로 정확도순 정렬된 상위 top_k개 뉴스 본문 수집
-    """
     base = "https://search.hankyung.com/search/news"
     seen = set()
     all_articles = []
@@ -62,9 +59,6 @@ def crawl_hankyung(corp_name: str, top_k: int = 15, max_pages: int = 5):
 
 
 def extract_article_text(url: str, headers: dict):
-    """
-    한경 기사 본문 텍스트와 날짜 추출
-    """
     try:
         resp = requests.get(url, headers=headers, timeout=10)
         resp.raise_for_status()
