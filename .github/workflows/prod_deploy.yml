@@ -39,7 +39,7 @@ jobs:
           mkdir -p ./deploy-ai
           cp ./fastapi_project/requirements.txt ./deploy-ai/
           cp -r ./fastapi_project/scripts ./deploy-ai/scripts
-          cp ./.env ./deploy-ai/
+          cp ./.env ./deploy-ai/.env
           cp -r ./fastapi_project/app ./deploy-ai/app
 
           echo "Uploading to: ${{ secrets.GCS_PROD_BUCKET_PATH }}/ai/$DEPLOY_PATH"
