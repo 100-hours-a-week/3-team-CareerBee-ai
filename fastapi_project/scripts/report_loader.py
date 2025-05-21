@@ -10,7 +10,7 @@ if os.path.exists("db/chroma"):
 else:
     print("ℹ️ 기존 Chroma 디렉토리가 없어서 삭제 생략.")
 
-def load_and_embed_reports(csv_path: str = "fastapi_project/app/data/catch_company_details.csv"):
+def load_and_embed_reports(csv_path: str = "app/data/catch_company_details.csv"):
     df = pd.read_csv(csv_path)
     count = 0
     for _, row in df.iterrows():
