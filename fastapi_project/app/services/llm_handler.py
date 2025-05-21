@@ -1,10 +1,9 @@
-import os
+import httpx
 import json
 import re
 import time
-import requests
 
-VLLM_API_URL = "http://localhost:8001/v1/chat/completions"  # 필요시 IP:포트로 수정
+VLLM_API_URL = "http://localhost:8001/v1/chat/completions"
 
 SYSTEM_PROMPT = """
 너는 사용자의 이력서를 분석하는 인공지능이야. 다음 항목을 추출해서 딱 JSON 형식으로만 응답해. 주석이나 설명은 절대 하지 마.
@@ -34,7 +33,7 @@ SYSTEM_PROMPT = """
 }
 """
 
-def extract_info_from_resume(resume_text: str) -> dict:
+async def extract_info_from_resume(resume_text: str) -> dict:
     payload = {
         "model": "mistralai/Mistral-7B-Instruct-v0.3",
         "messages": [
@@ -46,9 +45,10 @@ def extract_info_from_resume(resume_text: str) -> dict:
     }
 
     try:
-        start = time.time()  # ⏱️ 시작 시간 기록
-        response = requests.post(VLLM_API_URL, json=payload)
-        end = time.time()    # ⏱️ 끝 시간 기록
+        start = time.time()
+        async with httpx.AsyncClient() as client:
+            response = await client.post(VLLM_API_URL, json=payload)
+        end = time.time()
 
         response.raise_for_status()
         result = response.json()
