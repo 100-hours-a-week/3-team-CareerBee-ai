@@ -2,15 +2,24 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.responses import JSONResponse
-from app.routes import health, resume_create, resume_extract, feedback
+from app.routes import health, resume_create, resume_extract, feedback, summary
+from app.services.summary_service import run_summary_pipeline
+from apscheduler.schedulers.background import BackgroundScheduler
+from pytz import timezone
 from dotenv import load_dotenv
 import traceback
 
+# 환경변수 로드
 load_dotenv(override=True)
+
 app = FastAPI()
 
+# 📌 스케줄러 등록 (매주 월요일 정오에 요약 실행)
+scheduler = BackgroundScheduler()
+scheduler.add_job(run_summary_pipeline, 'cron', day_of_week='mon', hour=12, timezone=timezone("Asia/Seoul"))
+scheduler.start()
 
-# HTTPException
+# 예외 핸들러들
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     return JSONResponse(
@@ -22,8 +31,6 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         },
     )
 
-
-# 유효성 검증 에러 (Pydantic 모델 에러 등)
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(
@@ -35,11 +42,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         },
     )
 
-
-# 3. 일반적인 예외 (미처 처리되지 않은 예외)
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
-    traceback.print_exc()  # 서버 콘솔에 에러 로그 출력
+    traceback.print_exc()
     return JSONResponse(
         status_code=500,
         content={
@@ -49,8 +54,14 @@ async def generic_exception_handler(request: Request, exc: Exception):
         },
     )
 
-
+# 라우터 등록
 app.include_router(resume_create.router, tags=["Resume"])
 app.include_router(resume_extract.router, tags=["Resume"])
 app.include_router(health.router)
 app.include_router(feedback.router, tags=["Feedback"])
+app.include_router(summary.router, tags=["Summary"])
+
+# 기본 헬스 체크
+@app.get("/")
+def health_check():
+    return {"status": "ok"}
