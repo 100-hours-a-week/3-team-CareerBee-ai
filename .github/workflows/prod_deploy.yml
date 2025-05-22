@@ -23,7 +23,7 @@ jobs:
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          project_id: ${{ secrets.PROD_GCP_PROJECT_ID }}
 
       - name: Set timestamp-based path (Asia/Seoul)
         run: |
@@ -34,30 +34,31 @@ jobs:
         run: |
           echo "${{ secrets.ENV_FILE_CONTENTS }}" > .env
 
-      - name: Upload AI source to GCS
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: Upload build to S3
         run: |
           mkdir -p ./deploy-ai
-          cp ./fastapi_project/requirements.txt ./deploy-ai/
-          cp -r ./fastapi_project/scripts ./deploy-ai/scripts
-          cp ./.env ./deploy-ai/.env
-          cp -r ./fastapi_project/app ./deploy-ai/app
-
-          echo "Uploading to: ${{ secrets.GCS_PROD_BUCKET_PATH }}/ai/$DEPLOY_PATH"
-          gcloud storage cp ./deploy-ai/.env "${{ secrets.GCS_PROD_BUCKET_PATH }}/ai/$DEPLOY_PATH/.env"
-          gcloud storage cp -r ./deploy-ai/app "${{ secrets.GCS_PROD_BUCKET_PATH }}/ai/$DEPLOY_PATH/app"
-          gcloud storage cp -r ./deploy-ai/scripts "${{ secrets.GCS_PROD_BUCKET_PATH }}/ai/$DEPLOY_PATH/scripts"
-          gcloud storage cp ./deploy-ai/requirements.txt "${{ secrets.GCS_PROD_BUCKET_PATH }}/ai/$DEPLOY_PATH/requirements.txt"
+          cp -r ./fastapi_project/* ./deploy-ai/
+          cp .env ./deploy-ai/.env
+          echo "Uploading to: s3://${{ secrets.PROD_S3_BUCKET_NAME }}/artifacts/ai/$DEPLOY_PATH"
+          aws s3 cp ./deploy-ai "s3://${{ secrets.PROD_S3_BUCKET_NAME }}/artifacts/ai/$DEPLOY_PATH/" --recursive
 
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.GCE_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.PROD_GCE_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.GCE_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.PROD_GCE_HOST }} >> ~/.ssh/known_hosts
 
       - name: Trigger remote deploy script on GCE
         run: |
-          ssh ${{ secrets.GCE_USER }}@${{ secrets.GCE_HOST }} "bash ~/release/deploy-ai.sh $DEPLOY_PATH"
+          ssh ${{ secrets.PROD_GCE_USER }}@${{ secrets.PROD_GCE_HOST }} "bash ~/release/deploy-ai.sh $DEPLOY_PATH"
 
       - name: Notify Discord on Success
         if: success()
