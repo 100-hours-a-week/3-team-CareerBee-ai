@@ -87,7 +87,7 @@ jobs:
 
             pkill -f "uvicorn" || true
 
-            python3.12 -m venv "mnt/data/venv"
+            python3.12 -m venv /mnt/data/venv
             source /mnt/data/venv/bin/activate
             
             mkdir -p /mnt/data/tmp
