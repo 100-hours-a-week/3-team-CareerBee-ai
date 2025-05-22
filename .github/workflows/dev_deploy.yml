@@ -87,15 +87,16 @@ jobs:
 
             pkill -f "uvicorn" || true
 
-            python3.12 -m venv /mnt/data/venv
-            source /mnt/data/venv/bin/activate
+            export TMPDIR=/mnt/data
+            python3.12 -m venv \${TMPDIR}/venv
+            source \${TMPDIR}/venv/bin/activate
             
-            mkdir -p /mnt/data/tmp
+            mkdir -p \${TMPDIR}/tmp
             pip install --upgrade pip
-            pip install --no-cache-dir --prefer-binary --find-links /mnt/data/tmp -r ~/release/requirements.txt
+            pip install --no-cache-dir --prefer-binary --find-links \${TMPDIR}/tmp -r ~/release/requirements.txt
 
             cd ~/release
-            nohup /mnt/data/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 > ~/logs/ai.log 2>&1 &
+            nohup \${TMPDIR}/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 > ~/logs/ai.log 2>&1 &
           EOF
 
       # - name: Notify Discord on Success
