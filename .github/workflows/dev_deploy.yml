@@ -83,7 +83,7 @@ jobs:
             export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION}"
 
             mkdir -p ~/release ~/logs
-            aws s3 cp "${S3_BUCKET_INFRA}/ai/${DEPLOY_PATH}/" ~/release/ --recursive --exclude "*" --include "app/*" --include "scripts/*"
+            aws s3 cp "${S3_BUCKET_INFRA}/ai/${DEPLOY_PATH}/" ~/release/ --recursive
 
             pkill -f "uvicorn" || true
 
