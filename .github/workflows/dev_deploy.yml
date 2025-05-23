@@ -87,8 +87,7 @@ jobs:
 
             pkill -f "uvicorn" || true
 
-            export TMPDIR=/mnt/data
-            python3.12 -m venv \${TMPDIR}/venv
+            export TMPDIR=/mnt/ssd
             source \${TMPDIR}/venv/bin/activate
             
             mkdir -p \${TMPDIR}/tmp
