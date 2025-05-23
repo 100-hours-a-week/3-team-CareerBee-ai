@@ -2,7 +2,11 @@ import requests
 import os
 import time
 
+<<<<<<< HEAD
 VLLM_URL = os.getenv("VLLM_URL", "http://34.170.200.212:8000")
+=======
+VLLM_URL = os.getenv("VLLM_URL", "http://localhost:8000")
+>>>>>>> origin/develop
 MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.3"
 
 
