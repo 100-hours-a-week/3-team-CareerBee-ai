@@ -6,7 +6,8 @@ from langchain_community.embeddings import SentenceTransformerEmbeddings
 from app.utils.text_cleaner import clean_summary
 
 embedding_function = SentenceTransformerEmbeddings(
-    model_name="snunlp/KR-SBERT-V40K-klueNLI-augSTS"
+    model_name="snunlp/KR-SBERT-V40K-klueNLI-augSTS",
+    model_kwargs={"device": "cpu"}
 )
 
 chroma = Chroma(
