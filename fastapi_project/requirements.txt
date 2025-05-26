@@ -24,6 +24,7 @@ PyPDF2==3.0.1
 pdfplumber==0.11.6
 pytesseract==0.3.13
 pillow==11.2.1
+pdf2image==1.17.0
 filetype==1.2.0
 
 # --- .env, 환경, 파일 처리 ---
