@@ -16,8 +16,15 @@ app = FastAPI()
 
 # 📌 스케줄러 등록 (매주 월요일 정오에 요약 실행)
 scheduler = BackgroundScheduler()
-scheduler.add_job(run_summary_pipeline, 'cron', day_of_week='mon', hour=12, timezone=timezone("Asia/Seoul"))
+scheduler.add_job(
+    run_summary_pipeline,
+    "cron",
+    day_of_week="mon",
+    hour=12,
+    timezone=timezone("Asia/Seoul"),
+)
 scheduler.start()
+
 
 # 예외 핸들러들
 @app.exception_handler(StarletteHTTPException)
@@ -31,6 +38,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         },
     )
 
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(
@@ -41,6 +49,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "detail": exc.errors(),
         },
     )
+
 
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
@@ -54,12 +63,14 @@ async def generic_exception_handler(request: Request, exc: Exception):
         },
     )
 
+
 # 라우터 등록
 app.include_router(resume_create, tags=["Resume"])
 app.include_router(resume_extract, tags=["Resume"])
 app.include_router(health)
 app.include_router(feedback, tags=["Feedback"])
 app.include_router(update_summary, tags=["Summary"])
+
 
 # 기본 헬스 체크
 @app.get("/")
