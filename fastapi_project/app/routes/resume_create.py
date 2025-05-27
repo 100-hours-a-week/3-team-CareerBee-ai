@@ -18,13 +18,13 @@ router = APIRouter()
 
 @router.post("/resume/draft")
 async def generate_resume_by_agent(request: ResumeCreateRequest):
-    logging.info("[1] 요청 들어옴")
+    logging.info("요청 들어옴")
 
-    filename = generate_resume_draft(request)
+    filename = await generate_resume_draft(request)
     # file_url = f"https://storage.googleapis.com/gcs-ssmu-dev-static/resume-create/{filename}"
     file_url = f"generated_resumes/{filename}"  # 또는 GCS 등 외부 URL이면 해당 경로로
 
-    logging.info("[2] 이력서 생성 완료: %s", file_url)
+    logging.info("이력서 생성 완료: %s", file_url)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

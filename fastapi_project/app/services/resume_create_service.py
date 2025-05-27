@@ -3,9 +3,10 @@ from docx import Document
 from docx.shared import Pt
 from datetime import datetime
 from app.schemas.resume_create import ResumeCreateRequest
+import asyncio
 
 
-def generate_resume_draft(data: ResumeCreateRequest) -> str:
+def _generate_resume_doc(data: ResumeCreateRequest, filepath: str) -> str:
     doc = Document()
     doc.add_heading("이력서 초안 (자동 생성 템플릿)", level=0)
 
@@ -63,11 +64,19 @@ def generate_resume_draft(data: ResumeCreateRequest) -> str:
     for i in range(data.certification_count):
         add_underlined_paragraph(f"자격증 {i + 1}", 50)
 
-    # 저장
+    doc.save(filepath)
+
+
+# 저장
+async def generate_resume_draft(data: ResumeCreateRequest) -> str:
+    await asyncio.sleep(1)
+
     filename = f"resume_prompt_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
     save_dir = "./generated_resumes"
     os.makedirs(save_dir, exist_ok=True)  # 폴더가 없으면 생성
     filepath = os.path.join(save_dir, filename)
-    doc.save(filepath)
+
+    # 동기 함수를 비동기로 offload
+    await asyncio.to_thread(_generate_resume_doc, data, filepath)
 
     return filename

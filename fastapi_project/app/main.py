@@ -16,7 +16,6 @@ app = FastAPI()
 
 # 📌 스케줄러 등록 (매주 월요일 정오에 요약 실행)
 scheduler = BackgroundScheduler()
-<<<<<<< HEAD
 scheduler.add_job(
     run_summary_pipeline,
     "cron",
@@ -27,11 +26,6 @@ scheduler.add_job(
 scheduler.start()
 
 
-=======
-scheduler.add_job(run_summary_pipeline, 'cron', day_of_week='mon', hour=12, timezone=timezone("Asia/Seoul"))
-scheduler.start()
-
->>>>>>> origin/develop
 # 예외 핸들러들
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
@@ -44,10 +38,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         },
     )
 
-<<<<<<< HEAD
 
-=======
->>>>>>> origin/develop
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(
@@ -59,10 +50,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         },
     )
 
-<<<<<<< HEAD
 
-=======
->>>>>>> origin/develop
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
     traceback.print_exc()
@@ -75,10 +63,7 @@ async def generic_exception_handler(request: Request, exc: Exception):
         },
     )
 
-<<<<<<< HEAD
 
-=======
->>>>>>> origin/develop
 # 라우터 등록
 app.include_router(resume_create, tags=["Resume"])
 app.include_router(resume_extract, tags=["Resume"])
@@ -86,15 +71,8 @@ app.include_router(health)
 app.include_router(feedback, tags=["Feedback"])
 app.include_router(update_summary, tags=["Summary"])
 
-<<<<<<< HEAD
 
 # 기본 헬스 체크
 @app.get("/")
 def health_check():
     return {"status": "ok"}
-=======
-# 기본 헬스 체크
-@app.get("/")
-def health_check():
-    return {"status": "ok"}
->>>>>>> origin/develop
