@@ -62,6 +62,6 @@ app.include_router(feedback, tags=["Feedback"])
 app.include_router(update_summary, tags=["Summary"])
 
 # 기본 헬스 체크
-@app.get("/")
+@app.get("/health")
 def health_check():
     return {"status": "ok"}

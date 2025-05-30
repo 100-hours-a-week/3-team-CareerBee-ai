@@ -1,11 +1,11 @@
-name: Deploy AI Server to GCE (Dev)
+name: Deploy AI Server to GCE (DEV)
 
 on:
   push:
     branches: [ develop ]
 
 jobs:
-  Deploy-DEV:
+  "Deploy-DEV":
     runs-on: ubuntu-latest
 
     env:
@@ -15,45 +15,104 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: google auth
-        uses: google-github-actions/auth@v1
-        with:
-          credentials_json: "${{ secrets.GCP_SA_KEY }}"
+      - name: Decrypt env file
+        run: |
+          openssl enc -aes-256-cbc -d -pbkdf2 -in cicd-variables.sh.enc -out cicd-variables.sh -k "${{ secrets.DEV_CICD_VARIABLES_ENC_PW }}"
+          chmod +x cicd-variables.sh
 
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-          
+      - name: Load selected env variables into GitHub Environment
+        run: |
+          source ./cicd-variables.sh
+
+          echo "::add-mask::$SSH_KEY"
+          echo "::add-mask::$SSH_KEY_BASE64"
+          echo "::add-mask::$GCP_SERVER_IP"
+          echo "::add-mask::$AWS_ACCESS_KEY_ID"
+          echo "::add-mask::$AWS_SECRET_ACCESS_KEY"
+          echo "::add-mask::$AWS_DEFAULT_REGION"
+          echo "::add-mask::$S3_BUCKET_INFRA"
+          echo "::add-mask::$APP_ENV"
+          echo "::add-mask::$VLLM_URL"
+          echo "::add-mask::$PYTHONPATH"
+          echo "::add-mask::$DB_HOST"
+          echo "::add-mask::$DB_USER"
+          echo "::add-mask::$DB_PASSWORD"
+          echo "::add-mask::$DB_NAME"
+
+          echo "SSH_KEY=$SSH_KEY" >> $GITHUB_ENV
+          echo "SSH_KEY_BASE64=$SSH_KEY_BASE64" >> $GITHUB_ENV
+          echo "GCP_SERVER_IP=$GCP_SERVER_IP" >> $GITHUB_ENV
+          echo "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" >> $GITHUB_ENV
+          echo "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" >> $GITHUB_ENV
+          echo "AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION" >> $GITHUB_ENV
+          echo "S3_BUCKET_INFRA=$S3_BUCKET_INFRA" >> $GITHUB_ENV
+          echo "APP_ENV=${APP_ENV}" >> $GITHUB_ENV
+          echo "VLLM_URL=${VLLM_URL}" >> $GITHUB_ENV
+          echo "PYTHONPATH=${PYTHONPATH}" >> $GITHUB_ENV
+          echo "DB_HOST=${DB_HOST}" >> $GITHUB_ENV
+          echo "DB_USER=${DB_USER}" >> $GITHUB_ENV
+          echo "DB_PASSWORD=${DB_PASSWORD}" >> $GITHUB_ENV
+          echo "DB_NAME=${DB_NAME}" >> $GITHUB_ENV
+
+      - name: Restore SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${SSH_KEY_BASE64}" | base64 --decode > "${SSH_KEY}"
+          chmod 600 "${SSH_KEY}"
+
+      - name: Create .env file
+        run: |
+          echo "APP_ENV=${APP_ENV}" >> .env
+          echo "VLLM_URL=${VLLM_URL}" >> .env
+          echo "PYTHONPATH=${PYTHONPATH}" >> .env
+          echo "DB_HOST=${DB_HOST}" >> .env
+          echo "DB_USER=${DB_USER}" >> .env
+          echo "DB_PASSWORD=${DB_PASSWORD}" >> .env
+          echo "DB_NAME=${DB_NAME}" >> .env
+
       - name: Set timestamp-based path (Asia/Seoul)
         run: |
           TIMESTAMP=$(TZ='Asia/Seoul' date +%Y-%m-%d_%H_%M_%S)
           echo "DEPLOY_PATH=${TIMESTAMP}_${COMMIT_HASH}" >> $GITHUB_ENV
 
-      - name: Create .env file
-        run: |
-            echo "${{ secrets.ENV_FILE_CONTENTS }}" > .env
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
 
-      - name: Upload AI source to GCS
+      - name: Upload build to S3
         run: |
-            mkdir -p ./deploy-ai
-            cp ./fastapi_project/requirements.txt ./deploy-ai/
-            cp ./.env ./deploy-ai/
-            cp -r ./fastapi_project/app ./deploy-ai/app
-        
-            echo "Uploading to: ${{ secrets.GCS_DEV_BUCKET_PATH }}/ai/$DEPLOY_PATH"
-            gcloud storage cp -r ./deploy-ai/* "${{ secrets.GCS_DEV_BUCKET_PATH }}/ai/$DEPLOY_PATH/"
+          echo "Uploading to: ${S3_BUCKET_INFRA}/ai/${DEPLOY_PATH}"
+          aws s3 cp .env "${S3_BUCKET_INFRA}/ai/${DEPLOY_PATH}/.env"
+          aws s3 cp ./fastapi_project/ "${S3_BUCKET_INFRA}/ai/${DEPLOY_PATH}/" --recursive
 
-      - name: Setup SSH key
+      - name: Deploy on AI Server
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.GCE_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.GCE_HOST }} >> ~/.ssh/known_hosts
+          ssh -i "${SSH_KEY}" -o StrictHostKeyChecking=no "ubuntu@${GCP_SERVER_IP}" <<EOF
+            set -e
 
-      - name: Trigger remote deploy script on GCE
-        run: |
-          ssh ${{ secrets.GCE_USER }}@${{ secrets.GCE_HOST }} "bash ~/release/deploy-ai.sh $DEPLOY_PATH"
+            export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}"
+            export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"
+            export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION}"
+
+            mkdir -p ~/release ~/logs
+            aws s3 cp "${S3_BUCKET_INFRA}/ai/${DEPLOY_PATH}/" ~/release/ --recursive
+
+            pkill -f "uvicorn" || true
+
+            export TMPDIR=/mnt/ssd
+            source \${TMPDIR}/venv/bin/activate
+            
+            mkdir -p \${TMPDIR}/tmp
+            pip install --upgrade pip pip setuptools wheel
+            pip install --no-cache-dir --no-binary PyMuPDF "PyMuPDF==1.22.3"
+            pip install --no-cache-dir --prefer-binary --find-links \${TMPDIR}/tmp -r ~/release/requirements.txt
+
+            cd ~/release
+            nohup \${TMPDIR}/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 > ~/logs/ai.log 2>&1 &
+          EOF
 
       - name: Notify Discord on Success
         if: success()
@@ -63,12 +122,12 @@ jobs:
           BRANCH="${{ github.ref_name }}"
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           TIMESTAMP="${{ github.event.head_commit.timestamp }}"
-      
+
           DESCRIPTION="**Repository:** \`${REPO}\`
           **Branch:** \`${BRANCH}\`
           **Commit:** \`${COMMIT_MSG}\`
           [🔗 실행 로그 보기](${RUN_URL})"
-      
+
           jq -n \
             --arg desc "$DESCRIPTION" \
             --arg timestamp "$TIMESTAMP" \
@@ -83,7 +142,7 @@ jobs:
                 }
               ]
             }' > payload.json
-      
+
           curl -H "Content-Type: application/json" \
                 -X POST \
                 -d @payload.json \
@@ -97,12 +156,12 @@ jobs:
           BRANCH="${{ github.ref_name }}"
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           TIMESTAMP="${{ github.event.head_commit.timestamp }}"
-      
+
           DESCRIPTION="**Repository:** \`${REPO}\`
           **Branch:** \`${BRANCH}\`
           **Commit:** \`${COMMIT_MSG}\`
           [🔗 실행 로그 보기](${RUN_URL})"
-      
+
           jq -n \
             --arg desc "$DESCRIPTION" \
             --arg timestamp "$TIMESTAMP" \
@@ -117,7 +176,7 @@ jobs:
                 }
               ]
             }' > payload.json
-      
+
           curl -H "Content-Type: application/json" \
                 -X POST \
                 -d @payload.json \

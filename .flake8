@@ -1,0 +1,9 @@
+[flake8]
+max-line-length = 120
+exclude = .venv,__pycache__,build,dist
+ignore = E302, W292, F401 
+
+# 다음 규칙을 무시
+# E302: 함수나 클래스 정의 사이에 빈 줄이 필요
+# W292: 파일 끝에 새 줄이 없음
+# F401: 임포트된 모듈이 사용되지 않음
