@@ -309,3 +309,7 @@ yarl==1.20.0
 zipp==3.21.0
 zstandard==0.23.0
 streamlit
+google-cloud-core==2.4.3
+google-cloud-storage==3.1.0
+google-crc32c==1.7.1
+google-resumable-media==2.7.2

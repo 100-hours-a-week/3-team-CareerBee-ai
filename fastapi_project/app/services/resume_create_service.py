@@ -4,11 +4,13 @@ from docx.shared import Pt
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
+from io import BytesIO
 from datetime import datetime
 from app.schemas.resume_create import ResumeCreateRequest
 from app.agents.schema.resume_create_agent import ResumeAgentState
 from app.agents.nodes.create_resume import create_resume_node
 import asyncio
+from app.utils.upload_file_to_s3 import upload_file_to_s3
 
 
 # 구분선 넣기 함수
@@ -38,7 +40,7 @@ def add_underlined_paragraph(doc, label: str, length: int = 40):
     run.font.size = Pt(11)
 
 
-def _generate_resume_doc(data: ResumeCreateRequest, filepath: str) -> str:
+def _generate_resume_doc(data: ResumeCreateRequest) -> BytesIO:
     doc = Document()
 
     # 제목
@@ -105,23 +107,27 @@ def _generate_resume_doc(data: ResumeCreateRequest, filepath: str) -> str:
     add_horizontal_line(heading_paragraph)  # 구분선
     doc.add_paragraph(f"{data.additional_experiences}")
 
-    doc.save(filepath)
-    return filepath
+    byte_io = BytesIO()
+    doc.save(byte_io)
+    byte_io.seek(0)
+    return byte_io
 
 
 # 저장
 async def generate_resume_draft(data: ResumeCreateRequest) -> str:
     await asyncio.sleep(1)
 
+    # filename 생성
     filename = f"resume_prompt_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
-    save_dir = "./generated_resumes"
-    os.makedirs(save_dir, exist_ok=True)  # 폴더가 없으면 생성
-    filepath = os.path.join(save_dir, filename)
 
-    # 동기 함수를 비동기로 offload
-    await asyncio.to_thread(_generate_resume_doc, data, filepath)
+    # docx 생성 (in-memory)
+    byte_stream = await asyncio.to_thread(_generate_resume_doc, data)
 
-    return filename
+    # S3 업로드
+    s3_file_path = f"resume/{filename}"
+    file_url = upload_file_to_s3(byte_stream, s3_file_path)
+
+    return file_url
 
 
 # Agent resume saving util (from agent-generated text)
