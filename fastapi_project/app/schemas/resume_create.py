@@ -1,11 +1,13 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 
-class ProjectInfo(BaseModel):
-    title: str
-    duration: str
-    role: str
-    impact: str
+
+# class ProjectInfo(BaseModel):
+#     title: str
+#     duration: str
+#     role: str
+#     impact: str
+
 
 class ResumeCreateRequest(BaseModel):
     email: str = Field(..., description="이메일")

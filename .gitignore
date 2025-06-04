@@ -1,6 +1,8 @@
+
 # Python
 __pycache__/
 *.py[cod]
+*.pyc
 *.pyo
 *.pyd
 *.egg
@@ -11,7 +13,7 @@ build/
 # 가상환경
 .venv/
 venv/
-.env
+.env*
 *.env
 
 # 로그 및 캐시
@@ -19,14 +21,24 @@ venv/
 *.sqlite3
 *.db
 .DS_Store
+.cache/
+huggingface/
+*.arrow
+*.json
+.github/
+README.md
+
 
 # Jupyter
 .ipynb_checkpoints/
 
-# VSCode
+# IDE
 .vscode/
 .idea/
 
 # fastapi_project 내부 민감/임시 파일
 fastapi_project/app/data/latest_issues.json
 fastapi_project/app/db/chroma/
+
+# 기타
+*.docx
