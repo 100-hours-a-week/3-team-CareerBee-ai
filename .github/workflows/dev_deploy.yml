@@ -150,7 +150,7 @@ jobs:
               pip install --no-cache-dir --prefer-binary --find-links \${TMPDIR}/tmp -r ~/release/requirements.txt
 
               cd ~/release
-              nohup \${TMPDIR}/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 > ~/logs/ai.log 2>&1 &
+              nohup \${TMPDIR}/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 > /var/log/uvicorn.log 2>&1 &
             EOF
             
             aws s3 rm "${S3_BUCKET_INFRA}/ai/${DEPLOY_PATH}/" --recursive
