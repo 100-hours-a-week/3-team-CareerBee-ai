@@ -25,7 +25,6 @@ venv/
 huggingface/
 *.arrow
 *.json
-.github/
 README.md
 
 
