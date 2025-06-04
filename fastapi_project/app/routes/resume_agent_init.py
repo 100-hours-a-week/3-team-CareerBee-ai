@@ -6,7 +6,8 @@ from fastapi import APIRouter, status, Request, Body
 from fastapi.responses import JSONResponse
 from app.services.resume_create_service import generate_resume_draft
 from app.agents.graph.resume_agent import build_resume_agent
-from app.schemas.resume_agent import ResumeAgentRequest, ResumeAgentInitRequest
+from app.agents.schema.resume_create_agent import ResumeAgentState
+from app.schemas.resume_agent import ResumeAgentInitRequest, ResumeAgentRequest
 
 # 로깅 기본 설정
 logging.basicConfig(
@@ -25,7 +26,7 @@ async def initialize_resume_stream(payload: ResumeAgentInitRequest):
     agent = build_resume_agent()
 
     initial_state = ResumeAgentRequest(
-        inputs=payload.inputs.model_dump(),
+        inputs=payload.inputs,
         user_inputs={},  # 유저 답변은 초기에는 아직 없음
         answers=[],
         pending_questions=[],

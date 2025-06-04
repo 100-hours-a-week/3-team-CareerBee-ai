@@ -25,7 +25,7 @@ def build_resume_agent():
 
     builder.add_conditional_edges(
         "check_completion",
-        lambda state: state["info_ready"],
+        lambda state: state.info_ready,
         {True: "create_resume", False: "generate_question"},
     )
 
