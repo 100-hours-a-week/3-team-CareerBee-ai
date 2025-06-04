@@ -119,12 +119,14 @@ jobs:
           set -e
           for i in $(seq 1 5); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://dev-ai.careerbee.co.kr/")
-            if [ "\$STATUS" == "200" ]; then
+            if [ "$STATUS" == "200" ]; then
               break
             fi
+            echo $STATUS
+            sleep 10
           done
 
-          if [ "\$STATUS" != "200" ]; then
+          if [ "$STATUS" != "200" ]; then
             LATEST_VALID_BACKUP=$(aws s3 ls "${S3_BUCKET_INFRA}/ai/" | awk '{print $2}' | grep -v "^${DEPLOY_PATH}/$" | sort | tail -n 1 | sed 's#/$##')
             if [ -z "$LATEST_VALID_BACKUP" ]; then
               exit 1
@@ -151,7 +153,7 @@ jobs:
 
               cd ~/release
               nohup \${TMPDIR}/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 > /var/log/uvicorn.log 2>&1 &
-            EOF
+          EOF
             
             aws s3 rm "${S3_BUCKET_INFRA}/ai/${DEPLOY_PATH}/" --recursive
 
