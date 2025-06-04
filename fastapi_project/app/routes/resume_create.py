@@ -2,7 +2,7 @@ import os
 import traceback
 import logging
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, status, Request, Body
 from fastapi.responses import JSONResponse
 from app.schemas.resume_create import ResumeCreateRequest
 from app.services.resume_create_service import generate_resume_draft
@@ -18,7 +18,7 @@ router = APIRouter()
 
 @router.post("/resume/draft")
 async def generate_resume_by_agent(request: ResumeCreateRequest):
-    logging.info("요청 들어옴")
+    logging.info("기본 이력서 생성 요청 들어옴")
 
     filename = await generate_resume_draft(request)
     # file_url = f"https://storage.googleapis.com/gcs-ssmu-dev-static/resume-create/{filename}"
