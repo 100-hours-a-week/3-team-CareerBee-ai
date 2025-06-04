@@ -2,6 +2,7 @@ import json
 from app.utils.crawler import crawl_hankyung
 from app.utils.chroma_handler import add_news_to_chroma, delete_news_by_corp
 from app.utils.summarizer_core import generate_latest_issue
+from app.utils.text_cleaner import contains_excluded_keyword 
 
 def generate_issue_summaries(corp_list):
     print("\n전체 요약 파이프라인 시작")
@@ -14,8 +15,14 @@ def generate_issue_summaries(corp_list):
 
             delete_news_by_corp(corp)
             articles = crawl_hankyung(corp, max_pages=3)
+
             for text, url, date in articles:
-                if corp in text and len(text) > 100 and text.count(corp) >= 2:
+                if (
+                    corp in text and
+                    len(text) > 100 and
+                    text.count(corp) >= 2 and
+                    not contains_excluded_keyword(text, corp)
+                ):
                     add_news_to_chroma(text, corp=corp, url=url, date=date)
 
             summary = generate_latest_issue(corp)

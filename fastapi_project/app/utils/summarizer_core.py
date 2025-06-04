@@ -1,10 +1,13 @@
 import requests
+import re
 from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
 from langchain_community.embeddings import SentenceTransformerEmbeddings
+from app.utils.text_cleaner import clean_summary
 
 embedding_function = SentenceTransformerEmbeddings(
-    model_name="snunlp/KR-SBERT-V40K-klueNLI-augSTS"
+    model_name="snunlp/KR-SBERT-V40K-klueNLI-augSTS",
+    model_kwargs={"device": "cpu"}
 )
 
 chroma = Chroma(
@@ -14,7 +17,7 @@ chroma = Chroma(
 )
 
 def call_vllm(prompt: str) -> str:
-    url = "http://localhost:8000/v1/chat/completions"
+    url = "http://localhost:8001/v1/chat/completions"
     headers = {"Content-Type": "application/json"}
     payload = {
         "messages": [
@@ -41,10 +44,18 @@ def make_prompt(corp_name: str, context: str) -> str:
         f"[본문]\n{context}"
     )
 
+def has_batchim(korean_word: str) -> bool:
+    if not korean_word:
+        return False
+    last_char = korean_word[-1]
+    code = ord(last_char)
+    if 0xAC00 <= code <= 0xD7A3:
+        return (code - 0xAC00) % 28 != 0
+    return False
+
 def generate_latest_issue(corp_name: str, return_docs: bool = False):
     queries = ["채용 전략", "인사 정책", "조직 개편", "미래 성장성", "시장 경쟁력"]
 
-    # 공시: 무조건 1개 포함
     all_data = chroma.get(include=["metadatas", "documents"])
     report_doc_obj = None
     for meta, doc in zip(all_data['metadatas'], all_data['documents']):
@@ -55,7 +66,6 @@ def generate_latest_issue(corp_name: str, return_docs: bool = False):
             )
             break
 
-    # 뉴스: 의미 기반 검색
     news_docs = []
     for q in queries:
         result = chroma.similarity_search(
@@ -70,7 +80,6 @@ def generate_latest_issue(corp_name: str, return_docs: bool = False):
         )
         news_docs.extend(result)
 
-    # 중복 제거
     seen = set()
     unique_news_docs = []
     for doc in news_docs:
@@ -78,12 +87,11 @@ def generate_latest_issue(corp_name: str, return_docs: bool = False):
             unique_news_docs.append(doc)
             seen.add(doc.page_content)
 
-    # 아무 것도 없으면 종료
     if report_doc_obj is None and not unique_news_docs:
-        msg = f"최근 이슈가 없어요. {corp_name}는 평화롭군요."
+        particle = "은" if has_batchim(corp_name) else "는"
+        msg = f"최근 이슈가 없어요. {corp_name}{particle} 평화롭군요."
         return (msg, []) if return_docs else msg
 
-    # 6️⃣ context 구성
     context_parts = []
     used_docs = []
 
@@ -101,7 +109,6 @@ def generate_latest_issue(corp_name: str, return_docs: bool = False):
 
     context = "\n\n".join(context_parts)
 
-    # 7️⃣ LLM 요약 실행
     MAX_LEN = 4000
     if len(context) > MAX_LEN:
         chunks = [context[i:i+MAX_LEN] for i in range(0, len(context), MAX_LEN)]
@@ -113,4 +120,5 @@ def generate_latest_issue(corp_name: str, return_docs: bool = False):
     else:
         result = call_vllm(make_prompt(corp_name, context))
 
-    return (result, used_docs) if return_docs else result
+    cleaned = clean_summary(result, corp_name)
+    return (cleaned, used_docs) if return_docs else cleaned
