@@ -17,6 +17,7 @@ chromadb==0.4.24
 langchain==0.1.17
 langchain-community>=0.0.36,<0.1
 langchain-core>=0.1.48,<0.2.0
+langchain-openai
 
 # --- PDF 및 이미지 텍스트 처리 ---
 PyMuPDF==1.22.3
