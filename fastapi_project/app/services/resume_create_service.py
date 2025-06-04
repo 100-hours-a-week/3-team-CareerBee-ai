@@ -10,7 +10,7 @@ from app.schemas.resume_create import ResumeCreateRequest
 from app.agents.schema.resume_create_agent import ResumeAgentState
 from app.agents.nodes.create_resume import create_resume_node
 import asyncio
-from app.utils import upload_file_to_s3
+from app.utils.upload_file_to_s3 import upload_file_to_s3
 
 
 # 구분선 넣기 함수
@@ -124,7 +124,7 @@ async def generate_resume_draft(data: ResumeCreateRequest) -> str:
     byte_stream = await asyncio.to_thread(_generate_resume_doc, data)
 
     # S3 업로드
-    s3_file_path = f"resume-create/{filename}"
+    s3_file_path = f"resume/{filename}"
     file_url = upload_file_to_s3(byte_stream, s3_file_path)
 
     return file_url
