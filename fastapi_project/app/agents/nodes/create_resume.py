@@ -42,7 +42,7 @@ def create_resume_node(state):
 
     # 4️⃣ LLM 호출
     response = llm.invoke(full_context)
-    generated_resume = response.content.strip()
+    generated_resume = str(response.content).strip()
 
     full_resume_text = f"[이력서 초안]\n 생성일: {today}\n\n{generated_resume}"
 
