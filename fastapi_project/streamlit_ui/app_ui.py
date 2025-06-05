@@ -8,6 +8,11 @@ st.title("LangGraph 이력서 생성 테스트")
 
 # 상태 저장 초기화 (state dict 관리 → 안정화)
 if "state" not in st.session_state:
+    """
+    streamlit 세션이 새로 시작될 때마다 state 초기값을 세팅
+    이게 없다면 사용자가 처음 들어올 때 st.session_state.state가 존재하지 않아서 KeyError 발생
+    초기화 안 해주면 상태관리가 불안정해짐
+    """
     st.session_state.state = {
         "inputs": {},
         "user_inputs": {},
@@ -51,7 +56,7 @@ if not st.session_state.state["inputs"]:
                 "major_type": major_type,
                 "company_name": company_name,
                 "position": position,
-                "work_period": work_period,
+                "work_period": int(work_period),
                 "additional_experiences": additional_experience,
             }
             # 서버 호출

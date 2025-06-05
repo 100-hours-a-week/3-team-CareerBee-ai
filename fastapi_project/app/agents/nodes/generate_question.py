@@ -38,7 +38,10 @@ def generate_question_node(state):
     {context}
     """
 
-    response = llm.invoke(prompt).content.strip()
+    response_content = llm.invoke(prompt).content
+    print(f"Response content: {response_content}")  # 반환값 출력
+
+    response = response_content.strip() if isinstance(response_content, str) else "없음"
 
     if response == "없음":
         state.info_ready = True
