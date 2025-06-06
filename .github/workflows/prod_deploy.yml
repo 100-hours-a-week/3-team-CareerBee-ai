@@ -1,8 +1,8 @@
-name: Deploy AI Server to GCE (Prod)
+name: Deploy AI Server to GCP Compute Engine (Prod)
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   Deploy-PROD:
@@ -23,38 +23,42 @@ jobs:
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-          
+          project_id: ${{ secrets.PROD_GCP_PROJECT_ID }}
+
       - name: Set timestamp-based path (Asia/Seoul)
         run: |
           TIMESTAMP=$(TZ='Asia/Seoul' date +%Y-%m-%d_%H_%M_%S)
           echo "DEPLOY_PATH=${TIMESTAMP}_${COMMIT_HASH}" >> $GITHUB_ENV
 
-    
       - name: Create .env file
         run: |
-            echo "${{ secrets.ENV_FILE_CONTENTS }}" > .env
+          echo "${{ secrets.ENV_FILE_CONTENTS }}" > .env
 
-      - name: Upload AI source to GCS
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: Upload build to S3
         run: |
-              mkdir -p ./deploy-ai
-              cp ./fastapi_project/requirements.txt ./deploy-ai/
-              cp ./.env ./deploy-ai/
-              cp -r ./fastapi_project/app ./deploy-ai/app
-          
-              echo "Uploading to: ${{ secrets.GCS_PROD_BUCKET_PATH }}/ai/$DEPLOY_PATH"
-              gcloud storage cp -r ./deploy-ai/* "${{ secrets.GCS_PROD_BUCKET_PATH }}/ai/$DEPLOY_PATH/"
+          mkdir -p ./deploy-ai
+          cp -r ./fastapi_project/* ./deploy-ai/
+          cp .env ./deploy-ai/.env
+          echo "Uploading to: s3://${{ secrets.PROD_S3_BUCKET_NAME }}/artifacts/ai/$DEPLOY_PATH"
+          aws s3 cp ./deploy-ai "s3://${{ secrets.PROD_S3_BUCKET_NAME }}/artifacts/ai/$DEPLOY_PATH/" --recursive
 
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.GCE_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.PROD_GCE_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.GCE_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.PROD_GCE_HOST }} >> ~/.ssh/known_hosts
 
       - name: Trigger remote deploy script on GCE
         run: |
-          ssh ${{ secrets.GCE_USER }}@${{ secrets.GCE_HOST }} "bash ~/release/deploy-ai.sh $DEPLOY_PATH"
+          ssh ${{ secrets.PROD_GCE_USER }}@${{ secrets.PROD_GCE_HOST }} "bash ~/release/deploy-ai.sh $DEPLOY_PATH"
 
       - name: Notify Discord on Success
         if: success()
@@ -64,12 +68,12 @@ jobs:
           BRANCH="${{ github.ref_name }}"
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           TIMESTAMP="${{ github.event.head_commit.timestamp }}"
-      
+
           DESCRIPTION="**Repository:** \`${REPO}\`
           **Branch:** \`${BRANCH}\`
           **Commit:** \`${COMMIT_MSG}\`
           [🔗 실행 로그 보기](${RUN_URL})"
-      
+
           jq -n \
             --arg desc "$DESCRIPTION" \
             --arg timestamp "$TIMESTAMP" \
@@ -84,12 +88,12 @@ jobs:
                 }
               ]
             }' > payload.json
-      
+
           curl -H "Content-Type: application/json" \
                 -X POST \
                 -d @payload.json \
                 ${{ secrets.DISCORD_WEBHOOK_URL }}
-      
+
       - name: Notify Discord on Failure
         if: failure()
         run: |
@@ -98,12 +102,12 @@ jobs:
           BRANCH="${{ github.ref_name }}"
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           TIMESTAMP="${{ github.event.head_commit.timestamp }}"
-      
+
           DESCRIPTION="**Repository:** \`${REPO}\`
           **Branch:** \`${BRANCH}\`
           **Commit:** \`${COMMIT_MSG}\`
           [🔗 실행 로그 보기](${RUN_URL})"
-      
+
           jq -n \
             --arg desc "$DESCRIPTION" \
             --arg timestamp "$TIMESTAMP" \
@@ -118,7 +122,7 @@ jobs:
                 }
               ]
             }' > payload.json
-      
+
           curl -H "Content-Type: application/json" \
                 -X POST \
                 -d @payload.json \
