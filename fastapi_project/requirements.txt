@@ -17,16 +17,16 @@ chromadb==0.4.24
 chroma-hnswlib==0.7.3
 
 # --- LangChain 및 구성요소 ---
-langchain==0.3.25
-langchain-core==0.3.25
-langchain-community==0.3.25
-langchain-openai==0.2.10
+langchain>=0.3.20,<0.4.0
+langchain-core>=0.3.20,<0.4.0
+langchain-community>=0.3.20,<0.4.0
+langchain-openai>=0.2.0,<0.3.0
 
 # --- LangGraph ---
-langgraph==0.4.3
-langgraph-checkpoint==2.0.24
-langgraph-prebuilt==0.1.8
-langgraph-sdk==0.1.61
+langgraph>=0.4.0,<0.5.0
+langgraph-checkpoint>=2.0.0,<3.0.0
+langgraph-prebuilt>=0.1.0,<0.2.0
+langgraph-sdk>=0.1.0,<0.2.0
 
 # --- PDF 및 이미지 텍스트 처리 ---
 PyMuPDF==1.22.3
