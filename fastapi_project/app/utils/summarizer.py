@@ -25,7 +25,7 @@ def generate_issue_summaries(corp_list):
                 ):
                     add_news_to_chroma(text, corp=corp, url=url, date=date)
 
-            summary = generate_latest_issue(corp)
+            summary = generate_latest_issue(corp, return_docs=True)
             results[corp] = summary
             print(f"요약 완료: {corp}")
 
