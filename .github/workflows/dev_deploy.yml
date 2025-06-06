@@ -121,7 +121,7 @@ jobs:
         run: |
           set -e
           for i in $(seq 1 5); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://dev-ai.careerbee.co.kr/health")
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://dev-ai.careerbee.co.kr/health-check")
             if [ "$STATUS" == "200" ]; then
               break
             fi
