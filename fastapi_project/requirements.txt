@@ -20,7 +20,7 @@ chroma-hnswlib==0.7.3
 langchain==0.1.17
 langchain-community>=0.0.36,<0.1
 langchain-core>=0.1.48,<0.2.0
-langchain-openai==0.3.16
+langchain-openai==0.0.6
 
 # --- LangGraph ---
 langgraph==0.4.3
