@@ -17,10 +17,10 @@ chromadb==0.4.24
 chroma-hnswlib==0.7.3
 
 # --- LangChain 및 구성요소 ---
-langchain==0.1.99
-langchain-core==0.2.38
-langchain-community==0.0.36
-langchain-openai==0.1.8
+langchain==0.3.25
+langchain-core==0.3.25
+langchain-community==0.3.25
+langchain-openai==0.2.10
 
 # --- LangGraph ---
 langgraph==0.4.3
