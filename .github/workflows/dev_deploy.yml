@@ -101,7 +101,10 @@ jobs:
             export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"
             export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION}"
 
-            mkdir -p ~/release ~/logs
+            mkdir -p ~/release
+            sudo touch /var/log/uvicorn.log
+            sudo chown -R ubuntu:ubuntu /var/log/uvicorn.log
+            
             aws s3 cp "${S3_BUCKET_INFRA}/ai/${DEPLOY_PATH}/" ~/release/ --recursive
 
             pkill -f "uvicorn" || true
@@ -146,7 +149,10 @@ jobs:
               export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"
               export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION}"
 
-              mkdir -p ~/release ~/logs
+              mkdir -p ~/release
+              sudo touch /var/log/uvicorn.log
+              sudo chown -R ubuntu:ubuntu /var/log/uvicorn.log
+
               aws s3 cp "${S3_BUCKET_INFRA}/ai/${LATEST_VALID_BACKUP}/" ~/release/ --recursive
 
               pkill -f "uvicorn" || true
