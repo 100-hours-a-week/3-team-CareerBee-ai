@@ -93,6 +93,7 @@ jobs:
 
       - name: Deploy on AI Server
         run: |
+          echo "GCE 서버와 연결할 수 없음." > failure_reason.txt
           ssh -i "${SSH_KEY}" -o StrictHostKeyChecking=no "ubuntu@${GCP_SERVER_IP}" <<EOF
             set -e
 
@@ -100,7 +101,10 @@ jobs:
             export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"
             export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION}"
 
-            mkdir -p ~/release ~/logs
+            mkdir -p ~/release
+            sudo touch /var/log/uvicorn.log
+            sudo chown -R ubuntu:ubuntu /var/log/uvicorn.log
+            
             aws s3 cp "${S3_BUCKET_INFRA}/ai/${DEPLOY_PATH}/" ~/release/ --recursive
 
             pkill -f "uvicorn" || true
@@ -117,6 +121,8 @@ jobs:
             nohup \${TMPDIR}/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 > /var/log/uvicorn.log 2>&1 &
           EOF
 
+          rm -f failure_reason.txt
+
       - name: Health check and rollback if needed
         run: |
           set -e
@@ -130,6 +136,8 @@ jobs:
           done
 
           if [ "$STATUS" != "200" ]; then
+            echo "헬스 체크 실패. 상태 코드: $STATUS" > failure_reason.txt
+
             LATEST_VALID_BACKUP=$(aws s3 ls "${S3_BUCKET_INFRA}/ai/" | awk '{print $2}' | grep -v "^${DEPLOY_PATH}/$" | sort | tail -n 1 | sed 's#/$##')
             if [ -z "$LATEST_VALID_BACKUP" ]; then
               exit 1
@@ -141,7 +149,10 @@ jobs:
               export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"
               export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION}"
 
-              mkdir -p ~/release ~/logs
+              mkdir -p ~/release
+              sudo touch /var/log/uvicorn.log
+              sudo chown -R ubuntu:ubuntu /var/log/uvicorn.log
+
               aws s3 cp "${S3_BUCKET_INFRA}/ai/${LATEST_VALID_BACKUP}/" ~/release/ --recursive
 
               pkill -f "uvicorn" || true
@@ -206,9 +217,16 @@ jobs:
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           TIMESTAMP="${{ github.event.head_commit.timestamp }}"
 
+          if [ -f failure_reason.txt ]; then
+            FAILURE_REASON=$(cat failure_reason.txt)
+          else
+            FAILURE_REASON="워크플로 로그를 확인해 주세요."
+          fi
+
           DESCRIPTION="**Repository:** \`${REPO}\`
           **Branch:** \`${BRANCH}\`
           **Commit:** \`${COMMIT_MSG}\`
+          **실패 사유:** \`${FAILURE_REASON}\`
           [🔗 실행 로그 보기](${RUN_URL})"
 
           jq -n \
