@@ -10,6 +10,8 @@ jobs:
 
     env:
       COMMIT_HASH: ${{ github.sha }}
+      ECR_REPOSITORY: ${{ secrets.PROD_ECR_URI }}
+      ECR_REGION: ap-northeast-2
 
     steps:
       - name: Checkout code
@@ -25,14 +27,17 @@ jobs:
         with:
           project_id: ${{ secrets.PROD_GCP_PROJECT_ID }}
 
-      - name: Set timestamp-based path (Asia/Seoul)
+      - name: Set timestamp-based image tag (Asia/Seoul)
         run: |
-          TIMESTAMP=$(TZ='Asia/Seoul' date +%Y-%m-%d_%H_%M_%S)
-          echo "DEPLOY_PATH=${TIMESTAMP}_${COMMIT_HASH}" >> $GITHUB_ENV
+          TIMESTAMP=$(TZ='Asia/Seoul' date +%Y%m%d-%H%M%S)
+          echo "IMAGE_TAG=${TIMESTAMP}-${COMMIT_HASH}" >> $GITHUB_ENV
 
       - name: Create .env file
         run: |
           echo "${{ secrets.ENV_FILE_CONTENTS }}" > .env
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -41,13 +46,15 @@ jobs:
           aws-secret-access-key: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
 
-      - name: Upload build to S3
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and push Docker image to ECR
         run: |
-          mkdir -p ./deploy-ai
-          cp -r ./fastapi_project/* ./deploy-ai/
-          cp .env ./deploy-ai/.env
-          echo "Uploading to: s3://${{ secrets.PROD_S3_BUCKET_NAME }}/artifacts/ai/$DEPLOY_PATH"
-          aws s3 cp ./deploy-ai "s3://${{ secrets.PROD_S3_BUCKET_NAME }}/artifacts/ai/$DEPLOY_PATH/" --recursive
+          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
 
       - name: Setup SSH key
         run: |
@@ -56,9 +63,15 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.PROD_GCE_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Trigger remote deploy script on GCE
+      - name: Trigger remote deploy script on GCE (docker-compose pull && up)
         run: |
-          ssh ${{ secrets.PROD_GCE_USER }}@${{ secrets.PROD_GCE_HOST }} "bash ~/release/deploy-ai.sh $DEPLOY_PATH"
+          ssh ${{ secrets.PROD_GCE_USER }}@${{ secrets.PROD_GCE_HOST }} <<EOF
+            set -e
+            cd ~/docker
+            sed -i "s|image: .*/.*:.*|image: $IMAGE_NAME:$IMAGE_TAG|" docker-compose.yml
+            docker-compose pull ai
+            docker-compose up -d ai
+          EOF
 
       - name: Notify Discord on Success
         if: success()
