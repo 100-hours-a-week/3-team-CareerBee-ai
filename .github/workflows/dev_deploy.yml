@@ -38,6 +38,7 @@ jobs:
           echo "::add-mask::$DB_USER"
           echo "::add-mask::$DB_PASSWORD"
           echo "::add-mask::$DB_NAME"
+          echo "::add-mask::$OPENAI_API_KEY"
 
           echo "SSH_KEY=$SSH_KEY" >> $GITHUB_ENV
           echo "SSH_KEY_BASE64=$SSH_KEY_BASE64" >> $GITHUB_ENV
@@ -53,6 +54,7 @@ jobs:
           echo "DB_USER=${DB_USER}" >> $GITHUB_ENV
           echo "DB_PASSWORD=${DB_PASSWORD}" >> $GITHUB_ENV
           echo "DB_NAME=${DB_NAME}" >> $GITHUB_ENV
+          echo "OPENAI_API_KEY=${OPENAI_API_KEY}" >> $GITHUB_ENV
 
       - name: Restore SSH Key
         run: |
@@ -69,6 +71,7 @@ jobs:
           echo "DB_USER=${DB_USER}" >> .env
           echo "DB_PASSWORD=${DB_PASSWORD}" >> .env
           echo "DB_NAME=${DB_NAME}" >> .env
+          echo "OPENAI_API_KEY=${OPENAI_API_KEY}" >> .env
 
       - name: Set timestamp-based path (Asia/Seoul)
         run: |
@@ -111,8 +114,54 @@ jobs:
             pip install --no-cache-dir --prefer-binary --find-links \${TMPDIR}/tmp -r ~/release/requirements.txt
 
             cd ~/release
-            nohup \${TMPDIR}/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 > ~/logs/ai.log 2>&1 &
+            nohup \${TMPDIR}/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 > /var/log/uvicorn.log 2>&1 &
           EOF
+
+      - name: Health check and rollback if needed
+        run: |
+          set -e
+          for i in $(seq 1 5); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://dev-ai.careerbee.co.kr/health")
+            if [ "$STATUS" == "200" ]; then
+              break
+            fi
+            echo $STATUS
+            sleep 10
+          done
+
+          if [ "$STATUS" != "200" ]; then
+            LATEST_VALID_BACKUP=$(aws s3 ls "${S3_BUCKET_INFRA}/ai/" | awk '{print $2}' | grep -v "^${DEPLOY_PATH}/$" | sort | tail -n 1 | sed 's#/$##')
+            if [ -z "$LATEST_VALID_BACKUP" ]; then
+              exit 1
+            fi
+
+            ssh -i "${SSH_KEY}" -o StrictHostKeyChecking=no "ubuntu@${GCP_SERVER_IP}" <<EOF
+              set -e
+              export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}"
+              export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"
+              export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION}"
+
+              mkdir -p ~/release ~/logs
+              aws s3 cp "${S3_BUCKET_INFRA}/ai/${LATEST_VALID_BACKUP}/" ~/release/ --recursive
+
+              pkill -f "uvicorn" || true
+
+              export TMPDIR=/mnt/ssd
+              source \${TMPDIR}/venv/bin/activate
+              
+              mkdir -p \${TMPDIR}/tmp
+              pip install --upgrade pip pip setuptools wheel
+              pip install --no-cache-dir --no-binary PyMuPDF "PyMuPDF==1.22.3"
+              pip install --no-cache-dir --prefer-binary --find-links \${TMPDIR}/tmp -r ~/release/requirements.txt
+
+              cd ~/release
+              nohup \${TMPDIR}/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 > /var/log/uvicorn.log 2>&1 &
+          EOF
+            
+            aws s3 rm "${S3_BUCKET_INFRA}/ai/${DEPLOY_PATH}/" --recursive
+
+            exit 1
+          fi
 
       - name: Notify Discord on Success
         if: success()
