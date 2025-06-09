@@ -72,7 +72,8 @@ jobs:
           echo "DB_PASSWORD=${DB_PASSWORD}" >> .env
           echo "DB_NAME=${DB_NAME}" >> .env
           echo "OPENAI_API_KEY=${OPENAI_API_KEY}" >> .env
-
+          echo "S3_BUCKET_NAME=${S3_BUCKET_INFRA}" >> .env
+          
       - name: Set timestamp-based path (Asia/Seoul)
         run: |
           TIMESTAMP=$(TZ='Asia/Seoul' date +%Y-%m-%d_%H_%M_%S)
