@@ -39,6 +39,7 @@ jobs:
           echo "::add-mask::$DB_PASSWORD"
           echo "::add-mask::$DB_NAME"
           echo "::add-mask::$OPENAI_API_KEY"
+          echo "::add-mask::$S3_BUCKET_NAME"
 
           echo "SSH_KEY=$SSH_KEY" >> $GITHUB_ENV
           echo "SSH_KEY_BASE64=$SSH_KEY_BASE64" >> $GITHUB_ENV
@@ -55,6 +56,7 @@ jobs:
           echo "DB_PASSWORD=${DB_PASSWORD}" >> $GITHUB_ENV
           echo "DB_NAME=${DB_NAME}" >> $GITHUB_ENV
           echo "OPENAI_API_KEY=${OPENAI_API_KEY}" >> $GITHUB_ENV
+          echo "S3_BUCKET_NAME=$S3_BUCKET_NAME" >> $GITHUB_ENV
 
       - name: Restore SSH Key
         run: |
@@ -72,7 +74,7 @@ jobs:
           echo "DB_PASSWORD=${DB_PASSWORD}" >> .env
           echo "DB_NAME=${DB_NAME}" >> .env
           echo "OPENAI_API_KEY=${OPENAI_API_KEY}" >> .env
-          echo "S3_BUCKET_NAME=${S3_BUCKET_INFRA}" >> .env
+          echo "S3_BUCKET_NAME=${S3_BUCKET_NAME}" >> .env
           
       - name: Set timestamp-based path (Asia/Seoul)
         run: |
