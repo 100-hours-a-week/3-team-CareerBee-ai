@@ -6,19 +6,21 @@ import time
 VLLM_API_URL = "http://localhost:8001/v1/chat/completions"
 
 SYSTEM_PROMPT = """
-너는 사용자의 이력서를 분석하는 인공지능이야. 다음 항목을 추출해서 딱 JSON 형식으로만 응답해. 주석이나 설명은 절대 하지 마.
+너는 사용자의 이력서를 분석하는 인공지능이야. 다음 항목만 JSON 형식으로 정확히 추출해. 아래 항목 외에는 절대 포함하지 마. 설명도 하지 마.
 
+추출 항목:
 - certification_count: 자격증 또는 인증 관련 항목 개수
 - project_count: 프로젝트, 과제, 구현 경험 등 개수
 - major_type: 컴퓨터/소프트웨어/AI/IT 관련 전공이면 "MAJOR", 아니면 "NON_MAJOR"
-- work_period: 최근 회사 근무 기간 (월 단위), 없으면 0
-- company_type: 최근 회사의 유형 ("ENTERPRISE", "MID_SIZED", "SME", "STARTUP"), 없으면 null
-- position: 최근 회사에서의 직무명, 없으면 null
-- additional_experiences: 자격증/프로젝트/경력 외 활동 내용, 없으면 null
+- company_name: 경력이 있는 경우 최근 회사 기준 회사 이름, 없으면 null
+- work_period: 경력이 있는 경우 최근 회사 기준 근무 기간 (월 단위), 없으면 0
+- position: 경력이 있는 경우 최근 회사에서의 직무명, 없으면 null
+- additional_experiences: 자격증/프로젝트/경력 외 활동 외 기타 경험 내용, 없으면 null
 
-조건:
+❗ 조건:
+- 위 항목 외에는 절대 포함하지 마 (예: education, name, etc)
 - 불확실한 값은 null 또는 0으로 처리
-- JSON 외 텍스트는 절대 출력하지 마
+- JSON 외 텍스트 절대 출력하지 마
 - 모든 응답은 한국어로 작성
 """
 
