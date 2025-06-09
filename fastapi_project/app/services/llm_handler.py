@@ -24,7 +24,7 @@ SYSTEM_PROMPT = """
 
 async def extract_info_from_resume(resume_text: str) -> dict:
     payload = {
-        "model": "CohereLabs/aya-expanse-8b",
+        "model": "",
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT.strip()},
             {"role": "user", "content": resume_text.strip()[:3500]},
