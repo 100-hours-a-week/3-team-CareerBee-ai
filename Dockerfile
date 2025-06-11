@@ -7,7 +7,7 @@ ENV TZ=Asia/Seoul
 WORKDIR /ai
 
 COPY requirements.txt .
-RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && pip install --no-cache-dir -r fastapi_project/requirements.txt
 
 COPY ./fastapi_project /ai
 
