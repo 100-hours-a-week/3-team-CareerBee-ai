@@ -6,10 +6,10 @@ ENV TZ=Asia/Seoul
 
 WORKDIR /ai
 
-COPY requirements.txt .
-RUN pip install --upgrade pip && pip install --no-cache-dir -r fastapi_project/requirements.txt
-
+# 전체 프로젝트를 먼저 복사한 후 requirements 설치
 COPY ./fastapi_project /ai
+
+RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
 EXPOSE 8000
 
