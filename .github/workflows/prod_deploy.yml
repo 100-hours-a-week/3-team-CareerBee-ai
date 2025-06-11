@@ -63,14 +63,34 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.PROD_GCE_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Trigger remote deploy script on GCE (docker-compose pull && up)
+      - name: Copy .env to GCE instance
+        run: |
+          scp -i ~/.ssh/id_rsa .env ${{ secrets.PROD_GCE_USER }}@${{ secrets.PROD_GCE_HOST }}:/home/ssmu-morgan/ai/.env
+
+      - name: Trigger remote deploy script on GCE (docker run)
         run: |
           ssh ${{ secrets.PROD_GCE_USER }}@${{ secrets.PROD_GCE_HOST }} <<EOF
             set -e
-            cd ~/docker
-            sed -i "s|image: .*/.*:.*|image: $IMAGE_NAME:$IMAGE_TAG|" docker-compose.yml
-            docker-compose pull ai
-            docker-compose up -d ai
+
+            # 기존 ai 컨테이너 중지 및 삭제 (실행 중이면)
+            docker stop careerbee-ai || true
+            docker rm careerbee-ai || true
+
+            # 최신 이미지 pull (로그인 생략 가능: 이미 public or 로그인 완료된 상태면)
+            docker pull ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+
+            # 새 컨테이너 실행 (PORT, VOLUME, ENV 등에 맞춰 수정)
+            docker run -d \
+              --name careerbee-ai \
+              --env-file /home/ssmu-morgan/ai/.env \
+              -p 8000:8000 \
+              --restart=always \
+              --env-file /home/ssmu-morgan/ai/.env \
+              -v /mnt/ssd/venv:/mnt/ssd/venv:ro \
+              -v /home/ssmu-morgan/ai:/app \
+              ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG \
+              /bin/bash -c "source /mnt/ssd/venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
           EOF
 
       - name: Notify Discord on Success
