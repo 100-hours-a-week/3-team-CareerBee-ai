@@ -4,6 +4,17 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV TZ=Asia/Seoul
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    g++ \
+    make \
+    libpoppler-cpp-dev \
+    tesseract-ocr \
+    libtesseract-dev \
+    libgl1 \
+    curl wget unzip git \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /ai
 
 # 전체 프로젝트를 먼저 복사한 후 requirements 설치
