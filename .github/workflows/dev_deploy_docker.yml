@@ -84,7 +84,8 @@ jobs:
       - name: Save Docker image to cache
         if: steps.check-cache.outputs.exists == 'false'
         run: |
-          docker save ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }} | gzip > cache.tar.gz
+          sudo apt-get install -y pigz
+          docker save ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }} | pigz > cache.tar.gz
           aws s3 cp cache.tar.gz "${{ env.S3_BUCKET_INFRA }}/docker-cache.tar.gz"
 
       - name: Push Docker image to ECR
