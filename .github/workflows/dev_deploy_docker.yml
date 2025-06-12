@@ -19,7 +19,9 @@ jobs:
           ref: cicd/#40 # develop
         
       - name: Create secret_env.sh from secret
-        run: echo "${{ secrets.DEV_ENV }}" > secret_env.sh
+        run: |
+          echo "${{ secrets.DEV_ENV }}" > secret_env.sh
+          cat secret_env.sh
 
       - name: Load selected env variables into GitHub Environment
         run: |
