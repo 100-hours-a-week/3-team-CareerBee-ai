@@ -64,7 +64,6 @@ jobs:
 
       - name: Build Docker image using Dockerfile.dev
         run: |
-          ls .
           docker build -f Dockerfile.dev -t ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }} .
 
       - name: Push Docker image to ECR
