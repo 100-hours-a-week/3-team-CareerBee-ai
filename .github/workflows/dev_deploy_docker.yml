@@ -21,31 +21,26 @@ jobs:
       - name: Create secret_env.sh from secret
         run: echo "${{ secrets.DEV_ENV }}" > secret_env.sh
 
-      - name: Create .env from secret
-        run: |
-          cp secret_env.sh .env
-
       - name: Load selected env variables into GitHub Environment
         run: |
-          set -a
           source secret_env.sh
-          set +a
 
-          secrets=(
-            AWS_ACCESS_KEY_ID
-            AWS_SECRET_ACCESS_KEY
-            AWS_DEFAULT_REGION
-            ECR_REGISTRY 
-            S3_BUCKET_INFRA
-            GCP_CREDENTIALS_BASE64
-            GCP_PROJECT_ID
-          )
+          echo "::add-mask::$AWS_ACCESS_KEY_ID"
+          echo "::add-mask::$AWS_SECRET_ACCESS_KEY"
+          echo "::add-mask::$AWS_DEFAULT_REGION"
+          echo "::add-mask::$ECR_REGISTRY"
+          echo "::add-mask::$S3_BUCKET_INFRA"
+          echo "::add-mask::$GCP_CREDENTIALS_BASE64"
+          echo "::add-mask::$GCP_PROJECT_ID"
 
-          for secret in "${secrets[@]}"; do
-            echo "::add-mask::${!secret}"
-            echo "$secret=${!secret}" >> "$GITHUB_ENV"
-          done
-          
+          echo "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" >> $GITHUB_ENV
+          echo "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" >> $GITHUB_ENV
+          echo "AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION" >> $GITHUB_ENV
+          echo "ECR_REGISTRY=$ECR_REGISTRY" >> $GITHUB_ENV
+          echo "S3_BUCKET_INFRA=$S3_BUCKET_INFRA" >> $GITHUB_ENV
+          echo "GCP_CREDENTIALS_BASE64=$GCP_CREDENTIALS_BASE64" >> $GITHUB_ENV
+          echo "GCP_PROJECT_ID=$GCP_PROJECT_ID" >> $GITHUB_ENV
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v3
         with:
