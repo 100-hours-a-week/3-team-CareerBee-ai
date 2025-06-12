@@ -66,6 +66,7 @@ jobs:
           driver-opts: image=moby/buildkit:master,network=host
           buildkitd-flags: --debug
           name: mybuilder
+          use: true
 
       - name: Build Docker image using Dockerfile.dev with cache
         run: |
