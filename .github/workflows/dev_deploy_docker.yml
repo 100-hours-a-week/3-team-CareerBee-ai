@@ -19,7 +19,7 @@ jobs:
           ref: cicd/#40 # develop
         
       - name: Create .env from secret
-        run: echo "::add-mask::${{ secrets.DEV_ENV }}" > .env
+        run: printf "%s" "${{ secrets.DEV_ENV }}" > .env
 
       - name: Load selected env variables into GitHub Environment
         run: |
