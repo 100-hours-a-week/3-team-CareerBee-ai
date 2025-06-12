@@ -17,15 +17,14 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: cicd/#40 # develop
-        
-      - name: Create secret_env.sh from secret
+
+      - name: Decrypt env file
         run: |
-          echo "::add-mask::${{ secrets.DEV_ENV }}"
-          printf "%s\n" "${{ secrets.DEV_ENV }}" > secret_env.sh
+          openssl enc -aes-256-cbc -pbkdf2 -d -in DEV_ENV.enc -out .env -k "${{ secrets.DEV_ENV_ENC_PW }}"
 
       - name: Load selected env variables into GitHub Environment
         run: |
-          source ./secret_env.sh
+          source .env
 
           echo "::add-mask::$AWS_ACCESS_KEY_ID"
           echo "::add-mask::$AWS_SECRET_ACCESS_KEY"
