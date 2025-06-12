@@ -68,7 +68,8 @@ jobs:
       - name: Build Docker image using Dockerfile.dev with cache
         run: |
           docker build --push -f Dockerfile.dev \
-            --cache-to=type=registry,ref=${{ env.ECR_REGISTRY }}/ai-server:cache,mode=max \
+            --cache-from type=registry,ref=${{ env.ECR_REGISTRY }}/ai-server:cache \
+            --cache-to type=registry,ref=${{ env.ECR_REGISTRY }}/ai-server:cache,mode=max \
             -t ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }} .
 
       - name: Push Docker image to ECR
