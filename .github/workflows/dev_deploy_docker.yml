@@ -49,21 +49,6 @@ jobs:
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_DEFAULT_REGION }}
 
-      - name: Check if S3 cache exists
-        id: check-cache
-        run: |
-          if aws s3 ls "${{ env.S3_BUCKET_INFRA }}/docker-cache.tar.gz" > /dev/null 2>&1; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Restore docker cache (if exists)
-        if: steps.check-cache.outputs.exists == 'true'
-        run: |
-          aws s3 cp "${{ env.S3_BUCKET_INFRA }}/docker-cache.tar.gz" cache.tar.gz
-          docker load -i cache.tar.gz
-
       - name: Set timestamp-based path (Asia/Seoul)
         run: |
           TIMESTAMP=$(TZ='Asia/Seoul' date +%Y-%m-%d_%H_%M_%S)
@@ -79,14 +64,10 @@ jobs:
 
       - name: Build Docker image using Dockerfile.dev
         run: |
-          docker build -f Dockerfile.dev -t ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }} .
-
-      - name: Save Docker image to cache
-        if: steps.check-cache.outputs.exists == 'false'
-        run: |
-          sudo apt-get install -y pigz
-          docker save ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }} | pigz > cache.tar.gz
-          aws s3 cp cache.tar.gz "${{ env.S3_BUCKET_INFRA }}/docker-cache.tar.gz"
+          docker build -f Dockerfile.dev \
+            --cache-from=type=registry,ref=${{ env.ECR_REGISTRY }}/ai-server:cache \
+            --cache-to=type=registry,ref=${{ env.ECR_REGISTRY }}/ai-server:cache,mode=max \
+            -t ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }} .
 
       - name: Push Docker image to ECR
         run: |
