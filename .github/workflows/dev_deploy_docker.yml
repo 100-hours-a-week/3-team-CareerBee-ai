@@ -20,10 +20,21 @@ jobs:
         
       - name: Parse secrets.DEV_ENV line-by-line
         run: |
+          echo "::add-mask::${{ secrets.DEV_ENV }}"
           echo "${{ secrets.DEV_ENV }}" | while IFS='=' read -r key value; do
-            if [[ -n "$key" && -n "$value" ]]; then
+            key=$(echo "$key" | xargs)
+            value=$(echo "$value" | xargs)
+
+            if [[ -z "$key" || "$key" =~ ^# ]]; then
+              continue
+            fi
+
+            if [[ -n "$value" ]]; then
               echo "::add-mask::$value"
-              echo "$key=$value" >> "$GITHUB_ENV"
+              {
+                printf '%s=' "$key"
+                printf '%s\n' "$value"
+              } >> "$GITHUB_ENV"
             fi
           done
 
