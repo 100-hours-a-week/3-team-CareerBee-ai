@@ -79,10 +79,6 @@ jobs:
             -f Dockerfile.dev \
             -t ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }} .
 
-      - name: Push Docker image to ECR
-        run: |
-          docker push ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }}
-
       - name: Decode GCP credentials
         run: |
           echo "${{ env.GCP_CREDENTIALS_BASE64 }}" | base64 -d > gcp-key.json
@@ -92,73 +88,73 @@ jobs:
           gcloud auth activate-service-account --key-file=gcp-key.json
           gcloud config set project ${{ env.GCP_PROJECT_ID }}
 
-      # - name: Deploy to GCE AI server (via OS Config)
-      #   run: |
-      #     gcloud compute os-config exec-step-instances create \
-      #       --instance=ai-server-instance-name \
-      #       --zone=asia-northeast3-a \
-      #       --project=${{ env.GCP_PROJECT_ID }} \
-      #       --task-type=RUN \
-      #       --linux-exec-step-config='command=/bin/bash,args=["-c","
-      #         aws ecr get-login-password --region ${{ env.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }} &&
-      #         docker pull ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }} &&
-      #         docker stop ai-server || true &&
-      #         docker rm ai-server || true &&
-      #         docker run -d --name ai-server -p 8000:8000 ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }}
-      #       "]'
+      - name: Deploy to GCE AI server (via OS Config)
+        run: |
+          gcloud compute os-config exec-step-instances create \
+            --instance=ai-server-instance-name \
+            --zone=asia-northeast3-a \
+            --project=${{ env.GCP_PROJECT_ID }} \
+            --task-type=RUN \
+            --linux-exec-step-config='command=/bin/bash,args=["-c","
+              aws ecr get-login-password --region ${{ env.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }} &&
+              docker pull ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }} &&
+              docker stop ai-server || true &&
+              docker rm ai-server || true &&
+              docker run -d --name ai-server -p 8000:8000 ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }}
+            "]'
+          
+      - name: Health check and mark result
+        id: health
+        run: |
+          set -e
+          for i in $(seq 1 5); do
+            STATUS=$(curl --max-time 5 -s -o /dev/null -w "%{http_code}" "https://dev-ai.careerbee.co.kr/health-check")
+            echo "Status: $STATUS"
+            if [ "$STATUS" == "200" ]; then
+              echo "✅ Health check passed"
+              echo "result=success" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            sleep 10
+          done
 
-      # - name: Health check and mark result
-      #   id: health
-      #   run: |
-      #     set -e
-      #     for i in $(seq 1 5); do
-      #       STATUS=$(curl --max-time 5 -s -o /dev/null -w "%{http_code}" "https://dev-ai.careerbee.co.kr/health-check")
-      #       echo "Status: $STATUS"
-      #       if [ "$STATUS" == "200" ]; then
-      #         echo "✅ Health check passed"
-      #         echo "result=success" >> $GITHUB_OUTPUT
-      #         exit 0
-      #       fi
-      #       sleep 10
-      #     done
+          echo "❌ Health check failed after retries"
+          echo "result=failure" >> $GITHUB_OUTPUT
+          exit 0
 
-      #     echo "❌ Health check failed after retries"
-      #     echo "result=failure" >> $GITHUB_OUTPUT
-      #     exit 0
+      - name: Rollback AI server on GCE
+        if: steps.health.outputs.result == 'failure'
+        run: |
+          echo "🔄 롤백 시작: 이전 이미지로 복원"
 
-      # - name: Rollback AI server on GCE
-      #   if: steps.health.outputs.result == 'failure'
-      #   run: |
-      #     echo "🔄 롤백 시작: 이전 이미지로 복원"
+          PREV_TAG=$(aws ecr describe-images \
+            --repository-name ai-server \
+            --region ${{ env.AWS_DEFAULT_REGION }} \
+            --query 'sort_by(imageDetails,& imagePushedAt)[-2].imageTags[0]' \
+            --output text)
 
-      #     PREV_TAG=$(aws ecr describe-images \
-      #       --repository-name ai-server \
-      #       --region ${{ env.AWS_DEFAULT_REGION }} \
-      #       --query 'sort_by(imageDetails,& imagePushedAt)[-2].imageTags[0]' \
-      #       --output text)
+          echo "🔙 이전 태그: $PREV_TAG"
 
-      #     echo "🔙 이전 태그: $PREV_TAG"
+          gcloud compute os-config exec-step-instances create \
+            --instance=ai-server-instance-name \
+            --zone=asia-northeast3-a \
+            --project=${{ env.GCP_PROJECT_ID }} \
+            --task-type=RUN \
+            --linux-exec-step-config='command=/bin/bash,args=["-c","
+              aws ecr get-login-password --region ${{ env.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }} &&
+              docker pull ${{ env.ECR_REGISTRY }}/ai-server:'"$PREV_TAG"' &&
+              docker stop ai-server || true &&
+              docker rm ai-server || true &&
+              docker run -d --name ai-server -p 5000:5000 ${{ env.ECR_REGISTRY }}/ai-server:'"$PREV_TAG"'
+            "]'
 
-      #     gcloud compute os-config exec-step-instances create \
-      #       --instance=ai-server-instance-name \
-      #       --zone=asia-northeast3-a \
-      #       --project=${{ env.GCP_PROJECT_ID }} \
-      #       --task-type=RUN \
-      #       --linux-exec-step-config='command=/bin/bash,args=["-c","
-      #         aws ecr get-login-password --region ${{ env.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }} &&
-      #         docker pull ${{ env.ECR_REGISTRY }}/ai-server:'"$PREV_TAG"' &&
-      #         docker stop ai-server || true &&
-      #         docker rm ai-server || true &&
-      #         docker run -d --name ai-server -p 5000:5000 ${{ env.ECR_REGISTRY }}/ai-server:'"$PREV_TAG"'
-      #       "]'
+      - name: Set Discord message flag
+        if: steps.health.outputs.result == 'success'
+        run: echo "DISCORD_MSG=success" >> $GITHUB_ENV
 
-      # - name: Set Discord message flag
-      #   if: steps.health.outputs.result == 'success'
-      #   run: echo "DISCORD_MSG=success" >> $GITHUB_ENV
-
-      # - name: Set Discord message flag (rollback)
-      #   if: steps.health.outputs.result == 'failure'
-      #   run: echo "DISCORD_MSG=failure" >> $GITHUB_ENV
+      - name: Set Discord message flag (rollback)
+        if: steps.health.outputs.result == 'failure'
+        run: echo "DISCORD_MSG=failure" >> $GITHUB_ENV
 
       # - name: Notify Discord
       #   if: always()
