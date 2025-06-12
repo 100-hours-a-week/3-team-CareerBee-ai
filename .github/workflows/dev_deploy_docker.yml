@@ -18,36 +18,32 @@ jobs:
         with:
           ref: cicd/#40 # develop
 
-      - name: Decrypt env file
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secret.DEV_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secret.DEV_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: Download .env from S3
         run: |
-          openssl enc -aes-256-cbc -pbkdf2 -d -in DEV_ENV.enc -out .env -k "${{ secrets.DEV_ENV_ENC_PW }}"
+          aws s3 cp s3://${{ secrets.DEV_S3_INFRA_NAME }}/terraform.tfvars .env
 
       - name: Load selected env variables into GitHub Environment
         run: |
           source .env
 
-          echo "::add-mask::$AWS_ACCESS_KEY_ID"
-          echo "::add-mask::$AWS_SECRET_ACCESS_KEY"
           echo "::add-mask::$AWS_DEFAULT_REGION"
           echo "::add-mask::$ECR_REGISTRY"
           echo "::add-mask::$S3_BUCKET_INFRA"
           echo "::add-mask::$GCP_CREDENTIALS_BASE64"
           echo "::add-mask::$GCP_PROJECT_ID"
-
-          echo "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" >> $GITHUB_ENV
-          echo "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" >> $GITHUB_ENV
+          
           echo "AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION" >> $GITHUB_ENV
           echo "ECR_REGISTRY=$ECR_REGISTRY" >> $GITHUB_ENV
           echo "S3_BUCKET_INFRA=$S3_BUCKET_INFRA" >> $GITHUB_ENV
           echo "GCP_CREDENTIALS_BASE64=$GCP_CREDENTIALS_BASE64" >> $GITHUB_ENV
           echo "GCP_PROJECT_ID=$GCP_PROJECT_ID" >> $GITHUB_ENV
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v3
-        with:
-          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_DEFAULT_REGION }}
 
       - name: Set timestamp-based path (Asia/Seoul)
         run: |
@@ -136,7 +132,7 @@ jobs:
           echo "🔙 이전 태그: $PREV_TAG"
 
           gcloud compute os-config exec-step-instances create \
-            --instance=ai-server-instance-name \
+            --instance=gce-careerbee-dev-azone \
             --zone=asia-northeast3-a \
             --project=${{ env.GCP_PROJECT_ID }} \
             --task-type=RUN \
