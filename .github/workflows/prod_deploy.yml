@@ -85,11 +85,8 @@ jobs:
               --env-file /home/ssmu-morgan/ai/.env \
               -p 8000:8000 \
               --restart=always \
-              --env-file /home/ssmu-morgan/ai/.env \
-              -v /mnt/ssd/venv:/mnt/ssd/venv:ro \
               -v /home/ssmu-morgan/ai:/app \
-              ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG \
-              /bin/bash -c "source /mnt/ssd/venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+              ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
 
           EOF
 
