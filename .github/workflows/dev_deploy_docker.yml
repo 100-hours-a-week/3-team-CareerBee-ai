@@ -68,9 +68,12 @@ jobs:
           name: mybuilder
           use: true
 
+      - name: Check builders
+        run: docker buildx ls
+
       - name: Build Docker image using Dockerfile.dev with cache
         run: |
-          docker buildx build --builder=mybuilder \
+          docker buildx build \
             --cache-from=type=registry,ref=${{ env.ECR_REGISTRY }}/ai-server:cache \
             --cache-to=type=registry,ref=${{ env.ECR_REGISTRY }}/ai-server:cache,mode=max \
             --push \
