@@ -84,26 +84,35 @@ jobs:
           gcloud auth activate-service-account --key-file=gcp-key.json
           gcloud config set project ${{ env.GCP_PROJECT_ID }}
 
-      - name: Deploy to GCE via SSH
+      - name: Get EC2 instance ID and GCE private IP from tfstate
         run: |
-          gcloud compute ssh gce-careerbee-dev-azone \
-            --zone=asia-northeast3-a \
-            --project=${{ env.GCP_PROJECT_ID }} \
-            --command='
-              export AWS_REGION="${{ env.AWS_DEFAULT_REGION }}"
-              export ECR_REGISTRY="${{ env.ECR_REGISTRY }}"
-              export DEPLOY_TAG="${{ env.DEPLOY_TAG }}"
+          set -e
+          aws s3 cp s3://${{ secrets.DEV_S3_INFRA_NAME }}/terraform.tfstate terraform.tfstate
 
-              aws ecr get-login-password --region "$AWS_REGION" \
-                | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+          INSTANCE_A_ID=$(jq -r '.resources[] | select(.type=="aws_instance") | .instances[] | select(.attributes.tags.Name=="ec2-careerbee-dev-azone-service") | .attributes.id' terraform.tfstate)
+          [ -z "$INSTANCE_A_ID" ] && echo "Missing EC2 ID" && exit 1
+          echo "INSTANCE_A_ID=$INSTANCE_A_ID" >> $GITHUB_ENV
 
-              docker pull "$ECR_REGISTRY/ai-server:$DEPLOY_TAG"
+          GCE_PRIVATE_IP=$(jq -r '.resources[] | select(.type=="google_compute_instance") | .instances[] | select(.attributes.name=="gce-careerbee-dev-azone") | .attributes.network_interface[0].network_ip' terraform.tfstate)
+          [ -z "$GCE_PRIVATE_IP" ] && echo "Missing GCE IP" && exit 1
+          echo "GCE_PRIVATE_IP=$GCE_PRIVATE_IP" >> $GITHUB_ENV
 
-              docker stop ai-server || true
-              docker rm ai-server || true
-
-              docker run -d --name ai-server --env-file /home/ubuntu/.env -p 8000:8000 "$ECR_REGISTRY/ai-server:$DEPLOY_TAG"
-            '
+      - name: Run deployment via SSM
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploying to GCE from EC2 relay" \
+            --targets "Key=instanceIds,Values=${{ env.INSTANCE_A_ID }}" \
+            --parameters 'commands=[
+              "echo 🔁 GCE 배포 시작",
+              "ssh -o StrictHostKeyChecking=no -i /home/ubuntu/.ssh/id_rsa ubuntu@${{ env.GCE_PRIVATE_IP }} \\
+                \\\"aws ecr get-login-password --region ${{ env.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }} && \\
+                    docker pull ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }} && \\
+                    docker stop ai-server || true && \\
+                    docker rm ai-server || true && \\
+                    docker run -d --name ai-server --env-file /home/ubuntu/.env -p 8000:8000 ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }}\\\""
+            ]' \
+            --region ${{ env.AWS_DEFAULT_REGION }}
 
       - name: Health check and mark result
         id: health
@@ -137,23 +146,20 @@ jobs:
 
           echo "🔙 이전 태그: $PREV_TAG"
 
-          gcloud compute ssh gce-careerbee-dev-azone \
-            --zone=asia-northeast3-a \
-            --project=${{ env.GCP_PROJECT_ID }} \
-            --command='
-              export AWS_REGION="${{ env.AWS_DEFAULT_REGION }}"
-              export ECR_REGISTRY="${{ env.ECR_REGISTRY }}"
-
-              aws ecr get-login-password --region "$AWS_REGION" \
-                | docker login --username AWS --password-stdin "$ECR_REGISTRY"
-
-              docker pull "$ECR_REGISTRY/ai-server:$PREV_TAG"
-
-              docker stop ai-server || true
-              docker rm ai-server || true
-
-              docker run -d --name ai-server --env-file /home/ubuntu/.env -p 8000:8000 "$ECR_REGISTRY/ai-server:$PREV_TAG"
-            '
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploying to GCE from EC2 relay" \
+            --targets "Key=instanceIds,Values=${{ env.INSTANCE_A_ID }}" \
+            --parameters 'commands=[
+              "echo 🔁 GCE 배포 시작",
+              "ssh -o StrictHostKeyChecking=no -i /home/ubuntu/.ssh/id_rsa ubuntu@${{ env.GCE_PRIVATE_IP }} \\
+                \\\"aws ecr get-login-password --region ${{ env.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }} && \\
+                    docker pull ${{ env.ECR_REGISTRY }}/ai-server:$PREV_TAG && \\
+                    docker stop ai-server || true && \\
+                    docker rm ai-server || true && \\
+                    docker run -d --name ai-server --env-file /home/ubuntu/.env -p 8000:8000 ${{ env.ECR_REGISTRY }}/ai-server:$PREV_TAG\\\""
+            ]' \
+            --region ${{ env.AWS_DEFAULT_REGION }}
 
       - name: Set Discord message flag
         if: steps.health.outputs.result == 'success'
