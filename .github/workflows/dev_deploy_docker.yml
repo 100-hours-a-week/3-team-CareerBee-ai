@@ -20,7 +20,8 @@ jobs:
         
       - name: Create secret_env.sh from secret
         run: |
-          echo "${{ secrets.DEV_ENV }}" > secret_env.sh
+          printf "%s\n" "${{ secrets.DEV_ENV }}" > secret_env.sh
+          echo 1
           cat secret_env.sh
 
       - name: Load selected env variables into GitHub Environment
