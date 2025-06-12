@@ -62,7 +62,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
         with:
-          buildkitd-flags: --debug
           driver: docker-container
 
       - name: Build Docker image using Dockerfile.dev with BuildKit cache
