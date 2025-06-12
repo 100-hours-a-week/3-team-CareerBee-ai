@@ -1,0 +1,193 @@
+name: AI Docker CICD
+
+on:
+  push:
+    branches:
+      - cicd/#40 # develop
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      COMMIT_HASH: ${{ github.sha }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: cicd/#40 # develop
+      
+      - name: Create .env from secret
+        run: |
+          echo "${{ secrets.DEV_ENV }}" > .env
+
+      - name: Load selected env variables into GitHub Environment
+        run: |
+          set -a
+          source .env
+          set +a
+
+          for var in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION ECR_REGISTRY S3_BUCKET_INFRA GCP_CREDENTIALS_BASE64 GCP_PROJECT_ID; do
+            echo "::add-mask::${!var}"
+            echo "$var=${!var}" >> $GITHUB_ENV
+          done
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+          
+      - name: Set timestamp-based path (Asia/Seoul)
+        run: |
+          TIMESTAMP=$(TZ='Asia/Seoul' date +%Y-%m-%d_%H_%M_%S)
+          echo "DEPLOY_TAG=${TIMESTAMP}_${COMMIT_HASH}" >> $GITHUB_ENV
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry: ${{ env.ECR_REGISTRY }}
+          
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker image using Dockerfile.dev
+        run: |
+          docker build -f Dockerfile.dev -t ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }} .
+
+      - name: Push Docker image to ECR
+        run: |
+          docker push ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }}
+
+      - name: Decode GCP credentials
+        run: |
+          echo "${{ env.GCP_CREDENTIALS_BASE64 }}" | base64 -d > gcp-key.json
+
+      - name: Authenticate with GCP
+        run: |
+          gcloud auth activate-service-account --key-file=gcp-key.json
+          gcloud config set project ${{ env.GCP_PROJECT_ID }}
+
+      # - name: Deploy to GCE AI server (via OS Config)
+      #   run: |
+      #     gcloud compute os-config exec-step-instances create \
+      #       --instance=ai-server-instance-name \
+      #       --zone=asia-northeast3-a \
+      #       --project=${{ env.GCP_PROJECT_ID }} \
+      #       --task-type=RUN \
+      #       --linux-exec-step-config='command=/bin/bash,args=["-c","
+      #         aws ecr get-login-password --region ${{ env.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }} &&
+      #         docker pull ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }} &&
+      #         docker stop ai-server || true &&
+      #         docker rm ai-server || true &&
+      #         docker run -d --name ai-server -p 8000:8000 ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }}
+      #       "]'
+
+      # - name: Health check and mark result
+      #   id: health
+      #   run: |
+      #     set -e
+      #     for i in $(seq 1 5); do
+      #       STATUS=$(curl --max-time 5 -s -o /dev/null -w "%{http_code}" "https://dev-ai.careerbee.co.kr/health-check")
+      #       echo "Status: $STATUS"
+      #       if [ "$STATUS" == "200" ]; then
+      #         echo "✅ Health check passed"
+      #         echo "result=success" >> $GITHUB_OUTPUT
+      #         exit 0
+      #       fi
+      #       sleep 10
+      #     done
+
+      #     echo "❌ Health check failed after retries"
+      #     echo "result=failure" >> $GITHUB_OUTPUT
+      #     exit 0
+
+      # - name: Rollback AI server on GCE
+      #   if: steps.health.outputs.result == 'failure'
+      #   run: |
+      #     echo "🔄 롤백 시작: 이전 이미지로 복원"
+
+      #     PREV_TAG=$(aws ecr describe-images \
+      #       --repository-name ai-server \
+      #       --region ${{ env.AWS_DEFAULT_REGION }} \
+      #       --query 'sort_by(imageDetails,& imagePushedAt)[-2].imageTags[0]' \
+      #       --output text)
+
+      #     echo "🔙 이전 태그: $PREV_TAG"
+
+      #     gcloud compute os-config exec-step-instances create \
+      #       --instance=ai-server-instance-name \
+      #       --zone=asia-northeast3-a \
+      #       --project=${{ env.GCP_PROJECT_ID }} \
+      #       --task-type=RUN \
+      #       --linux-exec-step-config='command=/bin/bash,args=["-c","
+      #         aws ecr get-login-password --region ${{ env.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }} &&
+      #         docker pull ${{ env.ECR_REGISTRY }}/ai-server:'"$PREV_TAG"' &&
+      #         docker stop ai-server || true &&
+      #         docker rm ai-server || true &&
+      #         docker run -d --name ai-server -p 5000:5000 ${{ env.ECR_REGISTRY }}/ai-server:'"$PREV_TAG"'
+      #       "]'
+
+      # - name: Set Discord message flag
+      #   if: steps.health.outputs.result == 'success'
+      #   run: echo "DISCORD_MSG=success" >> $GITHUB_ENV
+
+      # - name: Set Discord message flag (rollback)
+      #   if: steps.health.outputs.result == 'failure'
+      #   run: echo "DISCORD_MSG=failure" >> $GITHUB_ENV
+
+      # - name: Notify Discord
+      #   if: always()
+      #   run: |
+      #     TITLE=""
+      #     DESC=""
+
+      #     if [ "${{ env.DISCORD_MSG }}" = "success" ]; then
+      #       TITLE="✅ 개발 환경에 AI 서버 배포 성공"
+      #       DESC="모두 배포에 성공했습니다."
+      #       COLOR=65280
+      #     elif [ "${{ env.DISCORD_MSG }}" = "failure" ]; then
+      #       TITLE="❌ 개발 환경에 AI 서버 배포 실패"
+      #       DESC="배포 실패로 롤백하였습니다."
+      #       COLOR=16711680
+      #     else
+      #       TITLE="⚠️ 배포 상태 알 수 없음"
+      #       DESC="워크플로 로그를 확인해 주세요."
+      #       COLOR=16753920
+      #     fi
+
+      #     COMMIT_MSG="${{ github.event.head_commit.message }}"
+      #     REPO="${{ github.repository }}"
+      #     BRANCH="${{ github.ref_name }}"
+      #     RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+      #     TIMESTAMP="${{ github.event.head_commit.timestamp }}"
+
+      #     DESCRIPTION="**Repository:** \`${REPO}\`
+      #     **Branch:** \`${BRANCH}\`
+      #     **Commit:** \`${COMMIT_MSG}\`
+      #     ${DESC}
+      #     [🔗 실행 로그 보기](${RUN_URL})"
+
+      #     jq -n \
+      #       --arg title "$TITLE" \
+      #       --arg desc "$DESCRIPTION" \
+      #       --arg timestamp "$TIMESTAMP" \
+      #       --argjson color "$COLOR" \
+      #       '{
+      #         "embeds": [
+      #           {
+      #             "title": $title,
+      #             "description": $desc,
+      #             "color": $color,
+      #             "footer": { "text": "GitHub Actions - DEV Deploy(AI)" },
+      #             "timestamp": $timestamp
+      #           }
+      #         ]
+      #       }' > payload.json
+
+      #     curl -H "Content-Type: application/json" \
+      #         -X POST \
+      #         -d @payload.json \
+      #         ${{ secrets.DISCORD_WEBHOOK_URL }}
