@@ -84,21 +84,27 @@ jobs:
           gcloud auth activate-service-account --key-file=gcp-key.json
           gcloud config set project ${{ env.GCP_PROJECT_ID }}
 
-      - name: Deploy to GCE AI server (via OS Config)
+      - name: Deploy to GCE via SSH
         run: |
-          gcloud compute os-config exec-step-instances create \
-            --instance=ai-server-instance-name \
+          gcloud compute ssh gce-careerbee-dev-azone \
             --zone=asia-northeast3-a \
             --project=${{ env.GCP_PROJECT_ID }} \
-            --task-type=RUN \
-            --linux-exec-step-config='command=/bin/bash,args=["-c","
-              aws ecr get-login-password --region ${{ env.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }} &&
-              docker pull ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }} &&
-              docker stop ai-server || true &&
-              docker rm ai-server || true &&
-              docker run -d --name ai-server -p 8000:8000 ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }}
-            "]'
-          
+            --command='
+              export AWS_REGION="${{ env.AWS_DEFAULT_REGION }}"
+              export ECR_REGISTRY="${{ env.ECR_REGISTRY }}"
+              export DEPLOY_TAG="${{ env.DEPLOY_TAG }}"
+
+              aws ecr get-login-password --region "$AWS_REGION" \
+                | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+              docker pull "$ECR_REGISTRY/ai-server:$DEPLOY_TAG"
+
+              docker stop ai-server || true
+              docker rm ai-server || true
+
+              docker run -d --name ai-server --env-file /home/ubuntu/.env -p 8000:8000 "$ECR_REGISTRY/ai-server:$DEPLOY_TAG"
+            '
+
       - name: Health check and mark result
         id: health
         run: |
@@ -131,18 +137,23 @@ jobs:
 
           echo "🔙 이전 태그: $PREV_TAG"
 
-          gcloud compute os-config exec-step-instances create \
-            --instance=gce-careerbee-dev-azone \
+          gcloud compute ssh gce-careerbee-dev-azone \
             --zone=asia-northeast3-a \
             --project=${{ env.GCP_PROJECT_ID }} \
-            --task-type=RUN \
-            --linux-exec-step-config='command=/bin/bash,args=["-c","
-              aws ecr get-login-password --region ${{ env.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }} &&
-              docker pull ${{ env.ECR_REGISTRY }}/ai-server:'"$PREV_TAG"' &&
-              docker stop ai-server || true &&
-              docker rm ai-server || true &&
-              docker run -d --name ai-server -p 5000:5000 ${{ env.ECR_REGISTRY }}/ai-server:'"$PREV_TAG"'
-            "]'
+            --command='
+              export AWS_REGION="${{ env.AWS_DEFAULT_REGION }}"
+              export ECR_REGISTRY="${{ env.ECR_REGISTRY }}"
+
+              aws ecr get-login-password --region "$AWS_REGION" \
+                | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+              docker pull "$ECR_REGISTRY/ai-server:$PREV_TAG"
+
+              docker stop ai-server || true
+              docker rm ai-server || true
+
+              docker run -d --name ai-server --env-file /home/ubuntu/.env -p 8000:8000 "$ECR_REGISTRY/ai-server:$PREV_TAG"
+            '
 
       - name: Set Discord message flag
         if: steps.health.outputs.result == 'success'
