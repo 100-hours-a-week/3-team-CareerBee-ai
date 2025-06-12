@@ -61,13 +61,17 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+        with:
+          install: true
+          driver-opts: image=moby/buildkit:latest
 
       - name: Build Docker image using Dockerfile.dev
         run: |
-          docker build -f Dockerfile.dev \
+          docker build -f Dockerfile.dev --builder default \
             --cache-from=type=registry,ref=${{ env.ECR_REGISTRY }}/ai-server:cache \
             --cache-to=type=registry,ref=${{ env.ECR_REGISTRY }}/ai-server:cache,mode=max \
-            -t ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }} .
+            -t ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }} \
+            --push .
 
       - name: Push Docker image to ECR
         run: |
