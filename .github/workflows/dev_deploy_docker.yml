@@ -28,10 +28,10 @@ jobs:
           set +a
 
           for var in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION ECR_REGISTRY S3_BUCKET_INFRA GCP_CREDENTIALS_BASE64 GCP_PROJECT_ID; do
-            echo var
-
-            echo "::add-mask::${var}"
-            echo "$var=$${var}" >> $GITHUB_ENV
+            echo $var
+            echo $!var
+            echo "::add-mask::${!var}"
+            echo "$var=${!var}" >> $GITHUB_ENV
           done
 
       - name: Configure AWS credentials
