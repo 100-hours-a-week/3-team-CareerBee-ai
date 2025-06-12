@@ -22,11 +22,10 @@ jobs:
         run: |
           printf "%s\n" "${{ secrets.DEV_ENV }}" > secret_env.sh
           echo 1
-          cat secret_env.sh
 
       - name: Load selected env variables into GitHub Environment
         run: |
-          source secret_env.sh
+          source ./secret_env.sh
 
           echo "::add-mask::$AWS_ACCESS_KEY_ID"
           echo "::add-mask::$AWS_SECRET_ACCESS_KEY"
