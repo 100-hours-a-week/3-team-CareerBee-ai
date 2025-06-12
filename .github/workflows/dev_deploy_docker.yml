@@ -21,23 +21,31 @@ jobs:
       - name: Create secret_env.sh from secret
         run: echo "${{ secrets.DEV_ENV }}" > secret_env.sh
 
+      - name: Create .env from secret
+        run: |
+          cp secret_env.sh .env
+
       - name: Load selected env variables into GitHub Environment
         run: |
           set -a
           source secret_env.sh
           set +a
 
-          for var in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION ECR_REGISTRY S3_BUCKET_INFRA GCP_CREDENTIALS_BASE64 GCP_PROJECT_ID; do
-            echo $var
-            echo ${!var}
-            echo "::add-mask::${!var}"
-            echo "$var=${!var}" >> $GITHUB_ENV
+          secrets=(
+            AWS_ACCESS_KEY_ID
+            AWS_SECRET_ACCESS_KEY
+            AWS_DEFAULT_REGION
+            ECR_REGISTRY 
+            S3_BUCKET_INFRA
+            GCP_CREDENTIALS_BASE64
+            GCP_PROJECT_ID
+          )
+
+          for secret in "${secrets[@]}"; do
+            echo "::add-mask::${!secret}"
+            echo "$secret=${!secret}" >> "$GITHUB_ENV"
           done
           
-      - name: Create .env from secret
-        run: |
-          cp secret_env.sh .env
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v3
         with:
