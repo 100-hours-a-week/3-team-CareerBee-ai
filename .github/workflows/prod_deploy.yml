@@ -71,7 +71,7 @@ jobs:
         run: |
           ssh ${{ secrets.PROD_GCE_USER }}@${{ secrets.PROD_GCE_HOST }} <<EOF
             set -e
-
+            aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
             # 기존 ai 컨테이너 중지 및 삭제 (실행 중이면)
             docker stop careerbee-ai || true
             docker rm careerbee-ai || true
