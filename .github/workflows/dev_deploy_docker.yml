@@ -1,4 +1,4 @@
-name: AI Docker CICD
+name: DEV AI Docker CICD
 
 on:
   push:
@@ -27,7 +27,8 @@ jobs:
 
       - name: Download .env from S3
         run: |
-          aws s3 cp s3://${{ secrets.DEV_S3_INFRA_NAME }}/terraform.tfvars .env
+          aws s3 cp s3://${{ secrets.DEV_S3_INFRA_NAME }}/terraform.tfvars.enc terraform.tfvars.enc
+          openssl aes-256-cbc -d -salt -pbkdf2 -in terraform.tfvars.enc -out .env -k ${{ secrets.DEV_TFVARS_ENC_PW }}
 
       - name: Load selected env variables into GitHub Environment
         run: |
@@ -117,7 +118,7 @@ jobs:
         run: |
           set -e
           for i in $(seq 1 5); do
-            STATUS=$(curl --max-time 5 -s -o /dev/null -w "%{http_code}" "https://dev-ai.careerbee.co.kr/health-check")
+            STATUS=$(curl --max-time 5 -s -o /dev/null -w "%{http_code}" "https://ai.dev.careerbee.co.kr/health-check")
             echo "Status: $STATUS"
             if [ "$STATUS" == "200" ]; then
               echo "✅ Health check passed"
