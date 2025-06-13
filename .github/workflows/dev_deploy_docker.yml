@@ -63,8 +63,6 @@ jobs:
           buildkitd-flags: --debug
           use: true
 
-      - name: Check builders
-        run: docker buildx ls
 
       - name: Build Docker image using Dockerfile.dev with cache
         run: |
