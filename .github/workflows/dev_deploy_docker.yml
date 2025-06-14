@@ -86,7 +86,7 @@ jobs:
       - name: Get EC2 instance ID and GCE private IP from tfstate
         run: |
           set -e
-          aws s3 cp s3://${{ secrets.DEV_S3_INFRA_NAME }}/terraform.tfstate terraform.tfstate
+          aws s3 cp s3://${{ secrets.DEV_S3_INFRA_NAME }}/tfstate/terraform_docker.tfstate terraform.tfstate
 
           INSTANCE_A_ID=$(jq -r '.resources[] | select(.type=="aws_instance") | .instances[] | select(.attributes.tags.Name=="ec2-careerbee-dev-azone-service") | .attributes.id' terraform.tfstate)
           [ -z "$INSTANCE_A_ID" ] && echo "Missing EC2 ID" && exit 1
