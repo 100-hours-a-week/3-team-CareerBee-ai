@@ -1,8 +1,7 @@
 name: Deploy AI Server to GCE (DEV)
 
 on:
-  push:
-    branches: [ develop ]
+  workflow_dispatch:
 
 jobs:
   "Deploy-DEV":

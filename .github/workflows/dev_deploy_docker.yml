@@ -1,9 +1,9 @@
-name: AI Docker CICD
+name: DEV AI Docker CICD
 
 on:
   push:
     branches:
-      - cicd/#40 # develop
+      - develop
 
 jobs:
   deploy:
@@ -16,7 +16,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          ref: cicd/#40 # develop
+          ref: develop
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v3
@@ -27,7 +27,8 @@ jobs:
 
       - name: Download .env from S3
         run: |
-          aws s3 cp s3://${{ secrets.DEV_S3_INFRA_NAME }}/terraform.tfvars .env
+          aws s3 cp s3://${{ secrets.DEV_S3_INFRA_NAME }}/terraform.tfvars.enc terraform.tfvars.enc
+          openssl aes-256-cbc -d -salt -pbkdf2 -in terraform.tfvars.enc -out .env -k ${{ secrets.DEV_TFVARS_ENC_PW }}
 
       - name: Load selected env variables into GitHub Environment
         run: |
@@ -85,7 +86,7 @@ jobs:
       - name: Get EC2 instance ID and GCE private IP from tfstate
         run: |
           set -e
-          aws s3 cp s3://${{ secrets.DEV_S3_INFRA_NAME }}/terraform.tfstate terraform.tfstate
+          aws s3 cp s3://${{ secrets.DEV_S3_INFRA_NAME }}/tfstate/terraform_docker.tfstate terraform.tfstate
 
           INSTANCE_A_ID=$(jq -r '.resources[] | select(.type=="aws_instance") | .instances[] | select(.attributes.tags.Name=="ec2-careerbee-dev-azone-service") | .attributes.id' terraform.tfstate)
           [ -z "$INSTANCE_A_ID" ] && echo "Missing EC2 ID" && exit 1
@@ -117,7 +118,7 @@ jobs:
         run: |
           set -e
           for i in $(seq 1 5); do
-            STATUS=$(curl --max-time 5 -s -o /dev/null -w "%{http_code}" "https://dev-ai.careerbee.co.kr/health-check")
+            STATUS=$(curl --max-time 5 -s -o /dev/null -w "%{http_code}" "https://ai.dev.careerbee.co.kr/health-check")
             echo "Status: $STATUS"
             if [ "$STATUS" == "200" ]; then
               echo "✅ Health check passed"
@@ -167,56 +168,56 @@ jobs:
         if: steps.health.outputs.result == 'failure'
         run: echo "DISCORD_MSG=failure" >> $GITHUB_ENV
 
-      # - name: Notify Discord
-      #   if: always()
-      #   run: |
-      #     TITLE=""
-      #     DESC=""
+      - name: Notify Discord
+        if: always()
+        run: |
+          TITLE=""
+          DESC=""
 
-      #     if [ "${{ env.DISCORD_MSG }}" = "success" ]; then
-      #       TITLE="✅ 개발 환경에 AI 서버 배포 성공"
-      #       DESC="모두 배포에 성공했습니다."
-      #       COLOR=65280
-      #     elif [ "${{ env.DISCORD_MSG }}" = "failure" ]; then
-      #       TITLE="❌ 개발 환경에 AI 서버 배포 실패"
-      #       DESC="배포 실패로 롤백하였습니다."
-      #       COLOR=16711680
-      #     else
-      #       TITLE="⚠️ 배포 상태 알 수 없음"
-      #       DESC="워크플로 로그를 확인해 주세요."
-      #       COLOR=16753920
-      #     fi
+          if [ "${{ env.DISCORD_MSG }}" = "success" ]; then
+            TITLE="✅ 개발 환경에 AI 서버 배포 성공"
+            DESC="모두 배포에 성공했습니다."
+            COLOR=65280
+          elif [ "${{ env.DISCORD_MSG }}" = "failure" ]; then
+            TITLE="❌ 개발 환경에 AI 서버 배포 실패"
+            DESC="배포 실패로 롤백하였습니다."
+            COLOR=16711680
+          else
+            TITLE="⚠️ 배포 상태 알 수 없음"
+            DESC="워크플로 로그를 확인해 주세요."
+            COLOR=16753920
+          fi
 
-      #     COMMIT_MSG="${{ github.event.head_commit.message }}"
-      #     REPO="${{ github.repository }}"
-      #     BRANCH="${{ github.ref_name }}"
-      #     RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-      #     TIMESTAMP="${{ github.event.head_commit.timestamp }}"
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          REPO="${{ github.repository }}"
+          BRANCH="${{ github.ref_name }}"
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          TIMESTAMP="${{ github.event.head_commit.timestamp }}"
 
-      #     DESCRIPTION="**Repository:** \`${REPO}\`
-      #     **Branch:** \`${BRANCH}\`
-      #     **Commit:** \`${COMMIT_MSG}\`
-      #     ${DESC}
-      #     [🔗 실행 로그 보기](${RUN_URL})"
+          DESCRIPTION="**Repository:** \`${REPO}\`
+          **Branch:** \`${BRANCH}\`
+          **Commit:** \`${COMMIT_MSG}\`
+          ${DESC}
+          [🔗 실행 로그 보기](${RUN_URL})"
 
-      #     jq -n \
-      #       --arg title "$TITLE" \
-      #       --arg desc "$DESCRIPTION" \
-      #       --arg timestamp "$TIMESTAMP" \
-      #       --argjson color "$COLOR" \
-      #       '{
-      #         "embeds": [
-      #           {
-      #             "title": $title,
-      #             "description": $desc,
-      #             "color": $color,
-      #             "footer": { "text": "GitHub Actions - DEV Deploy(AI)" },
-      #             "timestamp": $timestamp
-      #           }
-      #         ]
-      #       }' > payload.json
+          jq -n \
+            --arg title "$TITLE" \
+            --arg desc "$DESCRIPTION" \
+            --arg timestamp "$TIMESTAMP" \
+            --argjson color "$COLOR" \
+            '{
+              "embeds": [
+                {
+                  "title": $title,
+                  "description": $desc,
+                  "color": $color,
+                  "footer": { "text": "GitHub Actions - DEV Deploy(AI)" },
+                  "timestamp": $timestamp
+                }
+              ]
+            }' > payload.json
 
-      #     curl -H "Content-Type: application/json" \
-      #         -X POST \
-      #         -d @payload.json \
-      #         ${{ secrets.DISCORD_WEBHOOK_URL }}
+          curl -H "Content-Type: application/json" \
+              -X POST \
+              -d @payload.json \
+              ${{ secrets.DISCORD_WEBHOOK_URL }}
