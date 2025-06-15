@@ -2,7 +2,9 @@ name: Deploy AI Server to GCE (DEV)
 
 on:
   workflow_dispatch:
-
+  push:
+    branches:
+      - develop
 jobs:
   "Deploy-DEV":
     runs-on: ubuntu-latest
