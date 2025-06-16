@@ -34,7 +34,6 @@ def upload_file_to_s3(file_obj, filename):
         Params={"Bucket": S3_BUCKET_NAME, "Key": s3_key},
         ExpiresIn=3600,  # 1시간 유효
     )
-
     return presigned_url
 
 

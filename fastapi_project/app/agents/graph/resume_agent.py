@@ -18,9 +18,8 @@ def build_resume_agent():
     builder.add_node("check_completion", check_completion_node)
     builder.add_node("create_resume", create_resume_node)
 
-    builder.set_entry_point("generate_question")
+    builder.set_entry_point("receive_answer")
 
-    builder.add_edge("generate_question", "receive_answer")
     builder.add_edge("receive_answer", "check_completion")
 
     builder.add_conditional_edges(
@@ -28,6 +27,7 @@ def build_resume_agent():
         lambda state: state.info_ready,
         {True: "create_resume", False: "generate_question"},
     )
+    builder.add_edge("generate_question", "receive_answer")
 
     builder.add_edge("create_resume", END)
     return builder.compile()

@@ -8,6 +8,7 @@ from app.services.resume_create_service import generate_resume_draft
 from app.agents.graph.resume_agent import build_resume_agent
 from app.agents.schema.resume_create_agent import ResumeAgentState
 from app.schemas.resume_agent import ResumeAgentInitRequest, ResumeAgentRequest
+from app.agents.nodes.generate_question import generate_question_node
 
 # 로깅 기본 설정
 logging.basicConfig(
@@ -23,7 +24,7 @@ async def initialize_resume_stream(payload: ResumeAgentInitRequest):
     print(payload.inputs)
 
     # inputs만 받아서 ResumeAgentState 만들어서 stream 실행
-    agent = build_resume_agent()
+    # agent = build_resume_agent()
 
     initial_state = ResumeAgentRequest(
         inputs=payload.inputs,
@@ -36,21 +37,18 @@ async def initialize_resume_stream(payload: ResumeAgentInitRequest):
         asked_count=0,
     )
 
-    stream = agent.stream(initial_state)
-    result = None
+    # stream = agent.stream(initial_state)
+    # first_step = next(stream)
 
-    for step in stream:
-        logging.info("🌀 Agent stream step: %s", step)
-        result = step
+    updated_state = generate_question_node(initial_state)
 
-    node_output = list(result.values())[0]
     return {
-        "resume": node_output.get("resume"),
-        "docx_path": node_output.get("docx_path"),
-        "answers": node_output.get("answers", []),
-        "pending_questions": node_output.get("pending_questions", []),
-        "info_ready": node_output.get("info_ready", False),
-        "asked_count": node_output.get("asked_count", 0),
+        "resume": updated_state.resume,
+        "docx_path": updated_state.docx_path,
+        "answers": updated_state.answers,
+        "pending_questions": updated_state.pending_questions,
+        "info_ready": updated_state.info_ready,
+        "asked_count": updated_state.asked_count,
     }
 
 
