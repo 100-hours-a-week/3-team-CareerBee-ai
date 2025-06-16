@@ -10,6 +10,8 @@ jobs:
 
     env:
       COMMIT_HASH: ${{ github.sha }}
+      ECR_REPOSITORY: ${{ secrets.PROD_ECR_URI }}
+      ECR_REGION: ap-northeast-2
 
     steps:
       - name: Checkout code
@@ -25,14 +27,17 @@ jobs:
         with:
           project_id: ${{ secrets.PROD_GCP_PROJECT_ID }}
 
-      - name: Set timestamp-based path (Asia/Seoul)
+      - name: Set timestamp-based image tag (Asia/Seoul)
         run: |
-          TIMESTAMP=$(TZ='Asia/Seoul' date +%Y-%m-%d_%H_%M_%S)
-          echo "DEPLOY_PATH=${TIMESTAMP}_${COMMIT_HASH}" >> $GITHUB_ENV
+          TIMESTAMP=$(TZ='Asia/Seoul' date +%Y%m%d-%H%M%S)
+          echo "IMAGE_TAG=${TIMESTAMP}-${COMMIT_HASH}" >> $GITHUB_ENV
 
       - name: Create .env file
         run: |
           echo "${{ secrets.ENV_FILE_CONTENTS }}" > .env
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -41,13 +46,18 @@ jobs:
           aws-secret-access-key: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
 
-      - name: Upload build to S3
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and push Docker image to ECR
         run: |
-          mkdir -p ./deploy-ai
-          cp -r ./fastapi_project/* ./deploy-ai/
-          cp .env ./deploy-ai/.env
-          echo "Uploading to: s3://${{ secrets.PROD_S3_BUCKET_NAME }}/artifacts/ai/$DEPLOY_PATH"
-          aws s3 cp ./deploy-ai "s3://${{ secrets.PROD_S3_BUCKET_NAME }}/artifacts/ai/$DEPLOY_PATH/" --recursive
+          BASE_IMAGE=${{ steps.login-ecr.outputs.registry }}/careerbee-ai-base:latest
+          docker build \
+            --build-arg BASE_IMAGE_URI=$BASE_IMAGE \
+            -t $ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
 
       - name: Setup SSH key
         run: |
@@ -56,9 +66,32 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.PROD_GCE_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Trigger remote deploy script on GCE
+      - name: Copy .env to GCE instance
         run: |
-          ssh ${{ secrets.PROD_GCE_USER }}@${{ secrets.PROD_GCE_HOST }} "bash ~/release/deploy-ai.sh $DEPLOY_PATH"
+          scp -i ~/.ssh/id_rsa .env ${{ secrets.PROD_GCE_USER }}@${{ secrets.PROD_GCE_HOST }}:/home/ssmu-morgan/ai/.env
+
+      - name: Trigger remote deploy script on GCE (docker run)
+        run: |
+          ssh ${{ secrets.PROD_GCE_USER }}@${{ secrets.PROD_GCE_HOST }} <<EOF
+            set -e
+            aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
+            # 기존 ai 컨테이너 중지 및 삭제 (실행 중이면)
+            docker stop careerbee-ai || true
+            docker rm careerbee-ai || true
+
+            # 최신 이미지 pull (로그인 생략 가능: 이미 public or 로그인 완료된 상태면)
+            docker pull ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+
+            # 새 컨테이너 실행 (PORT, VOLUME, ENV 등에 맞춰 수정)
+            docker run -d \
+              --name careerbee-ai \
+              --env-file /home/ssmu-morgan/ai/.env \
+              -p 8000:8000 \
+              --restart=always \
+              -v /home/ssmu-morgan/ai:/app \
+              ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+
+          EOF
 
       - name: Notify Discord on Success
         if: success()

@@ -2,7 +2,16 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.responses import JSONResponse
-from app.routes import health, resume_create, resume_extract, feedback, update_summary
+from app.routes import (
+    health,
+    resume_create,
+    resume_extract,
+    feedback,
+    update_summary,
+)
+from app.routes.resume_agent_init import router as resume_agent_init_router
+from app.routes.resume_agent_update import router as resume_agent_update_router
+
 from app.services.summary_service import run_summary_pipeline
 from apscheduler.schedulers.background import BackgroundScheduler
 from pytz import timezone
@@ -65,14 +74,16 @@ async def generic_exception_handler(request: Request, exc: Exception):
 
 
 # 라우터 등록
-app.include_router(resume_create, tags=["Resume"])
-app.include_router(resume_extract, tags=["Resume"])
+app.include_router(resume_create, tags=["Resume-create"])
+app.include_router(resume_agent_init_router, tags=["Resume-agent-init"])
+app.include_router(resume_agent_update_router, tags=["Resume-agent-update"])
+app.include_router(resume_extract, tags=["Resume-extract"])
 app.include_router(health)
 app.include_router(feedback, tags=["Feedback"])
 app.include_router(update_summary, tags=["Summary"])
 
 
 # 기본 헬스 체크
-@app.get("/")
+@app.get("/health-check")
 def health_check():
     return {"status": "ok"}

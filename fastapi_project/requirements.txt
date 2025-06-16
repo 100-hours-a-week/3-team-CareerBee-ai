@@ -1,6 +1,7 @@
 # --- API 서버 ---
-fastapi==0.115.0
-uvicorn==0.27.0
+fastapi==0.115.12
+uvicorn==0.34.0
+streamlit 
 
 # --- 모델 및 vLLM ---
 vllm==0.8.5.post1
@@ -11,12 +12,21 @@ bitsandbytes>=0.45.3
 
 # --- 문장 임베딩 및 벡터 검색 (RAG) ---
 sentence-transformers==2.6.1
+sentencepiece==0.2.0
 chromadb==0.4.24
+chroma-hnswlib==0.7.3
 
 # --- LangChain 및 구성요소 ---
-langchain==0.1.17
-langchain-community>=0.0.36,<0.1
-langchain-core>=0.1.48,<0.2.0
+langchain>=0.3.20,<0.4.0
+langchain-core>=0.3.20,<0.4.0
+langchain-community>=0.3.20,<0.4.0
+langchain-openai>=0.2.0,<0.3.0
+
+# --- LangGraph ---
+langgraph>=0.4.0,<0.5.0
+langgraph-checkpoint>=2.0.0,<3.0.0
+langgraph-prebuilt>=0.1.0,<0.2.0
+langgraph-sdk>=0.1.0,<0.2.0
 
 # --- PDF 및 이미지 텍스트 처리 ---
 PyMuPDF==1.22.3
@@ -37,18 +47,32 @@ beautifulsoup4==4.12.3
 
 # --- DB 연동 및 CSV ---
 pymysql==1.1.0
+SQLAlchemy==2.0.40
 cryptography==44.0.3
 pandas==2.2.2
+numpy==1.26.4
 
 # --- OpenAI ---
-openai==1.52.0
+openai==1.77.0
 tiktoken==0.9.0
 
 # --- 데이터 검증 ---
 pydantic==2.11.4
+pydantic-settings==2.8.1
 
 # --- 스케줄러 ---
 apscheduler==3.10.4
 
 # --- 비동기 HTTP 요청 (LLM 호출 등) ---
 httpx==0.27.0
+aiofiles==24.1.0
+aiohttp==3.11.18
+
+# --- 기타 유틸 ---
+tenacity==8.5.0
+orjson==3.10.16
+tqdm==4.67.1
+
+# --- S3, GCS 연동 ---
+boto3==1.34.119
+google-cloud-storage==3.1.0
