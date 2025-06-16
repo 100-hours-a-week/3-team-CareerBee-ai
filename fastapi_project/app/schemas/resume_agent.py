@@ -1,7 +1,7 @@
 # app/schemas/resume_agent.py
 
 from pydantic import BaseModel, Field
-from typing import Dict, List
+from typing import Dict, List, Union
 
 
 class InputsModel(BaseModel):  # 사용자 초기 입력의 내부 필드 모델 (pydantic model)
@@ -19,13 +19,13 @@ class InputsModel(BaseModel):  # 사용자 초기 입력의 내부 필드 모델
 class ResumeAgentInitRequest(
     BaseModel
 ):  # 최초 init 호출시 FastAPI에서 입력받는 request 모델
-    inputs: InputsModel
+    inputs: Union[InputsModel, dict]
 
 
 class ResumeAgentRequest(
     BaseModel
 ):  # 전체 LangGraph state를 관리하는 메인 모델 (pydantic model)
-    inputs: InputsModel
+    inputs: Union[InputsModel, dict]
     user_inputs: Dict = Field(default_factory=dict)
     answers: List[Dict] = Field(default_factory=list)
     pending_questions: List[str] = Field(default_factory=list)
