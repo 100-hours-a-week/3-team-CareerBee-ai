@@ -26,27 +26,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.DEV_AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
 
-      - name: Download .env from S3
-        run: |
-          aws s3 cp s3://${{ secrets.DEV_S3_INFRA_NAME }}/terraform.tfvars.enc terraform.tfvars.enc
-          openssl aes-256-cbc -d -salt -pbkdf2 -in terraform.tfvars.enc -out .env -k ${{ secrets.DEV_TFVARS_ENC_PW }}
-
-      - name: Load selected env variables into GitHub Environment
-        run: |
-          source .env
-
-          echo "::add-mask::$AWS_DEFAULT_REGION"
-          echo "::add-mask::$ECR_REGISTRY"
-          echo "::add-mask::$S3_BUCKET_INFRA"
-          echo "::add-mask::$GCP_CREDENTIALS_BASE64"
-          echo "::add-mask::$GCP_PROJECT_ID"
-          
-          echo "AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION" >> $GITHUB_ENV
-          echo "ECR_REGISTRY=$ECR_REGISTRY" >> $GITHUB_ENV
-          echo "S3_BUCKET_INFRA=$S3_BUCKET_INFRA" >> $GITHUB_ENV
-          echo "GCP_CREDENTIALS_BASE64=$GCP_CREDENTIALS_BASE64" >> $GITHUB_ENV
-          echo "GCP_PROJECT_ID=$GCP_PROJECT_ID" >> $GITHUB_ENV
-
       - name: Set timestamp-based path (Asia/Seoul)
         run: |
           TIMESTAMP=$(TZ='Asia/Seoul' date +%Y-%m-%d_%H_%M_%S)
@@ -55,7 +34,7 @@ jobs:
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
         with:
-          registry: ${{ env.ECR_REGISTRY }}
+          registry: ${{ secrets.DEV_ECR_REGISTRY }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -65,55 +44,33 @@ jobs:
           buildkitd-flags: --debug
           use: true
 
-
       - name: Build Docker image using Dockerfile.dev with cache
         run: |
           docker buildx build \
-            --cache-from=type=registry,ref=${{ env.ECR_REGISTRY }}/ai-server:cache \
-            --cache-to=type=registry,ref=${{ env.ECR_REGISTRY }}/ai-server:cache,mode=max \
+            --cache-from=type=registry,ref=${{ secrets.DEV_ECR_REGISTRY }}/ai-server:cache \
+            --cache-to=type=registry,ref=${{ secrets.DEV_ECR_REGISTRY }}/ai-server:cache,mode=max \
             --push \
             -f Dockerfile.dev \
-            -t ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }} .
+            -t ${{ secrets.DEV_ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }} \
+            -t ${{ secrets.DEV_ECR_REGISTRY }}/ai-server:latest \
+            .
 
-      - name: Decode GCP credentials
-        run: |
-          echo "${{ env.GCP_CREDENTIALS_BASE64 }}" | base64 -d > gcp-key.json
-
-      - name: Authenticate with GCP
-        run: |
-          gcloud auth activate-service-account --key-file=gcp-key.json
-          gcloud config set project ${{ env.GCP_PROJECT_ID }}
-
-      - name: Get EC2 instance ID and GCE private IP from tfstate
+      - name: Health Check Webhook
         run: |
           set -e
-          aws s3 cp s3://${{ secrets.DEV_S3_INFRA_NAME }}/tfstate/terraform_docker.tfstate terraform.tfstate
+          if ! curl -sf https://webhook.dev.careerbee.co.kr/health-check; then
+            echo "❌ Health check failed"
+            echo "DISCORD_MSG=failure" >> $GITHUB_ENV
+            exit 0
+          fi
 
-          INSTANCE_A_ID=$(jq -r '.resources[] | select(.type=="aws_instance") | .instances[] | select(.attributes.tags.Name=="ec2-careerbee-dev-azone-service") | .attributes.id' terraform.tfstate)
-          [ -z "$INSTANCE_A_ID" ] && echo "Missing EC2 ID" && exit 1
-          echo "INSTANCE_A_ID=$INSTANCE_A_ID" >> $GITHUB_ENV
-
-          GCE_PRIVATE_IP=$(jq -r '.resources[] | select(.type=="google_compute_instance") | .instances[] | select(.attributes.name=="gce-careerbee-dev-azone") | .attributes.network_interface[0].network_ip' terraform.tfstate)
-          [ -z "$GCE_PRIVATE_IP" ] && echo "Missing GCE IP" && exit 1
-          echo "GCE_PRIVATE_IP=$GCE_PRIVATE_IP" >> $GITHUB_ENV
-
-      - name: Run deployment via SSM
+      - name: Trigger Deploy Webhook
+        if: env.DISCORD_MSG != 'failure'
         run: |
-          aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --comment "Deploying to GCE from EC2 relay" \
-            --targets "Key=instanceIds,Values=${{ env.INSTANCE_A_ID }}" \
-            --parameters 'commands=[
-              "echo 🔁 GCE 배포 시작",
-              "ssh -o StrictHostKeyChecking=no -i /home/ubuntu/.ssh/id_rsa ubuntu@${{ env.GCE_PRIVATE_IP }} \\
-                \\\"aws ecr get-login-password --region ${{ env.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }} && \\
-                    docker pull ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }} && \\
-                    docker stop ai-server || true && \\
-                    docker rm ai-server || true && \\
-                    docker run -d --name ai-server --env-file /home/ubuntu/.env -p 8000:8000 ${{ env.ECR_REGISTRY }}/ai-server:${{ env.DEPLOY_TAG }}\\\""
-            ]' \
-            --region ${{ env.AWS_DEFAULT_REGION }}
-
+          curl -X POST https://webhook.dev.careerbee.co.kr/deploy \
+            -H "Content-Type: application/json" \
+            -d '{"frontend_tag": "latest", "backend_tag": "latest", "ai_server_tag": "latest"}'
+            
       - name: Health check and mark result
         id: health
         run: |
@@ -123,51 +80,15 @@ jobs:
             echo "Status: $STATUS"
             if [ "$STATUS" == "200" ]; then
               echo "✅ Health check passed"
-              echo "result=success" >> $GITHUB_OUTPUT
+              echo "DISCORD_MSG=success" >> $GITHUB_ENV
               exit 0
             fi
             sleep 10
           done
 
           echo "❌ Health check failed after retries"
-          echo "result=failure" >> $GITHUB_OUTPUT
+          echo "DISCORD_MSG=failure" >> $GITHUB_ENV
           exit 0
-
-      - name: Rollback AI server on GCE
-        if: steps.health.outputs.result == 'failure'
-        run: |
-          echo "🔄 롤백 시작: 이전 이미지로 복원"
-
-          PREV_TAG=$(aws ecr describe-images \
-            --repository-name ai-server \
-            --region ${{ env.AWS_DEFAULT_REGION }} \
-            --query 'sort_by(imageDetails,& imagePushedAt)[-2].imageTags[0]' \
-            --output text)
-
-          echo "🔙 이전 태그: $PREV_TAG"
-
-          aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --comment "Deploying to GCE from EC2 relay" \
-            --targets "Key=instanceIds,Values=${{ env.INSTANCE_A_ID }}" \
-            --parameters 'commands=[
-              "echo 🔁 GCE 배포 시작",
-              "ssh -o StrictHostKeyChecking=no -i /home/ubuntu/.ssh/id_rsa ubuntu@${{ env.GCE_PRIVATE_IP }} \\
-                \\\"aws ecr get-login-password --region ${{ env.AWS_DEFAULT_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }} && \\
-                    docker pull ${{ env.ECR_REGISTRY }}/ai-server:$PREV_TAG && \\
-                    docker stop ai-server || true && \\
-                    docker rm ai-server || true && \\
-                    docker run -d --name ai-server --env-file /home/ubuntu/.env -p 8000:8000 ${{ env.ECR_REGISTRY }}/ai-server:$PREV_TAG\\\""
-            ]' \
-            --region ${{ env.AWS_DEFAULT_REGION }}
-
-      - name: Set Discord message flag
-        if: steps.health.outputs.result == 'success'
-        run: echo "DISCORD_MSG=success" >> $GITHUB_ENV
-
-      - name: Set Discord message flag (rollback)
-        if: steps.health.outputs.result == 'failure'
-        run: echo "DISCORD_MSG=failure" >> $GITHUB_ENV
 
       - name: Notify Discord
         if: always()
