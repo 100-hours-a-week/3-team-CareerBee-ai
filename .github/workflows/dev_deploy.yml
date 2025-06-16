@@ -1,9 +1,10 @@
 name: Deploy AI Server to GCE (DEV)
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ develop ]
-
+    branches:
+      - develop
 jobs:
   "Deploy-DEV":
     runs-on: ubuntu-latest
@@ -130,7 +131,7 @@ jobs:
         run: |
           set -e
           for i in $(seq 1 5); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://dev-ai.careerbee.co.kr/health-check")
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://ai.dev.careerbee.co.kr/health-check")
             if [ "$STATUS" == "200" ]; then
               break
             fi
