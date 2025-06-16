@@ -1,6 +1,8 @@
 # app_ui.py
 import streamlit as st
 import requests
+from copy import deepcopy
+from app.schemas.resume_agent import InputsModel
 
 BASE_URL = "http://localhost:8000"  # FastAPI 서버 주소
 
@@ -90,12 +92,19 @@ if st.session_state.state["inputs"] and not st.session_state.state["resume"]:
             )
             st.session_state.state["pending_questions"] = pending[1:]  # pop
 
-            # 서버 호출 (상태 업데이트)
+            # dict로 확실히 직렬화
+            payload = deepcopy(st.session_state.state)
+
+            if isinstance(payload["inputs"], InputsModel):
+                payload["inputs"] = payload["inputs"].dict()
+
             response = requests.post(
-                f"{BASE_URL}/resume/agent/update", json=st.session_state.state
+                "/resume/agent/update",
+                json=payload,  # FastAPI가 JSON → dict로 자동 역직렬화
             )
-            result = response.json()
-            st.session_state.state.update(result)
+
+            st.session_state.state.update(response.json())
+
 
 # ✅ 이력서 생성 완료 시
 if st.session_state.state.get("resume"):
