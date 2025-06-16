@@ -13,15 +13,15 @@ def create_resume_node(state):
     # 1️⃣ 기본 입력 정보를 문자열로 정리
     base_info = f"""
 [기본 입력 정보]
-- 이메일: {inputs.get('email', '')}
-- 선호 직무: {inputs.get('preferred_job', '')}
-- 전공 여부: {inputs.get('major_type', '')}
-- 재직 회사: {inputs.get('company_name', '')}
-- 직무: {inputs.get('position', '')}
-- 재직 기간: {inputs.get('work_period', '0')}개월
-- 자격증 개수: {inputs.get('certification_count', 0)}
-- 프로젝트 개수: {inputs.get('project_count', 0)}
-- 추가 경험: {inputs.get('additional_experiences', '')}
+- 이메일: {inputs.email}
+- 선호 직무: {inputs.preferred_job}
+- 전공 여부: {inputs.major_type}
+- 재직 회사: {inputs.company_name}
+- 직무: {inputs.position}
+- 재직 기간: {inputs.work_period}개월
+- 자격증 개수: {inputs.certification_count}
+- 프로젝트 개수: {inputs.project_count}
+- 추가 경험: {inputs.additional_experiences}
 """
 
     # 2️⃣ LLM 추가 질문에 대한 답변을 정리

@@ -14,8 +14,9 @@ embedding_function = SentenceTransformerEmbeddings(
 chroma = Chroma(
     collection_name="company_issues",
     embedding_function=embedding_function,
-    persist_directory="db/chroma"
+    persist_directory="db/chroma",
 )
+
 
 # 3️⃣ vLLM 서버 호출 함수
 def call_vllm(prompt: str) -> str:
@@ -23,15 +24,19 @@ def call_vllm(prompt: str) -> str:
     headers = {"Content-Type": "application/json"}
     payload = {
         "messages": [
-            {"role": "system", "content": "너는 취준생을 위한 한국어 기업 분석 요약 도우미야."},
+            {
+                "role": "system",
+                "content": "너는 취준생을 위한 한국어 기업 분석 요약 도우미야.",
+            },
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.3,
-        "max_tokens": 1800
+        "max_tokens": 1800,
     }
     resp = requests.post(url, headers=headers, json=payload)
     resp.raise_for_status()
     return resp.json()["choices"][0]["message"]["content"]
+
 
 # 4️⃣ 프롬프트 생성 함수 (공시 중심 요약 지시 포함)
 def make_prompt(corp_name: str, context: str) -> str:
@@ -47,6 +52,7 @@ def make_prompt(corp_name: str, context: str) -> str:
         f"[본문]\n{context}"
     )
 
+
 # 5️⃣ 최종 요약 생성 함수
 def generate_latest_issue(corp_name: str, return_docs: bool = False):
     queries = ["채용 전략", "인사 정책", "조직 개편", "미래 성장성", "시장 경쟁력"]
@@ -54,11 +60,10 @@ def generate_latest_issue(corp_name: str, return_docs: bool = False):
     # 공시: 무조건 1개 포함
     all_data = chroma.get(include=["metadatas", "documents"])
     report_doc_obj = None
-    for meta, doc in zip(all_data['metadatas'], all_data['documents']):
+    for meta, doc in zip(all_data["metadatas"], all_data["documents"]):
         if meta.get("corp") == corp_name and meta.get("type") == "report":
             report_doc_obj = Document(
-                page_content=doc,
-                metadata={"type": "report", "corp": corp_name}
+                page_content=doc, metadata={"type": "report", "corp": corp_name}
             )
             break
 
@@ -68,12 +73,7 @@ def generate_latest_issue(corp_name: str, return_docs: bool = False):
         result = chroma.similarity_search(
             q,
             k=3,
-            filter={
-                "$and": [
-                    {"corp": {"$eq": corp_name}},
-                    {"type": {"$eq": "news"}}
-                ]
-            }
+            filter={"$and": [{"corp": {"$eq": corp_name}}, {"type": {"$eq": "news"}}]},
         )
         news_docs.extend(result)
 
@@ -111,10 +111,13 @@ def generate_latest_issue(corp_name: str, return_docs: bool = False):
     # 7️⃣ LLM 요약 실행
     MAX_LEN = 4000
     if len(context) > MAX_LEN:
-        chunks = [context[i:i+MAX_LEN] for i in range(0, len(context), MAX_LEN)]
-        partial_summaries = [call_vllm(make_prompt(corp_name, chunk)) for chunk in chunks]
+        chunks = [context[i : i + MAX_LEN] for i in range(0, len(context), MAX_LEN)]
+        partial_summaries = [
+            call_vllm(make_prompt(corp_name, chunk)) for chunk in chunks
+        ]
         final_prompt = (
-            f"[통합 요약 지시]\n아래는 {corp_name}에 대한 부분 요약이야. 공시 내용을 중심으로 정리해줘.\n\n" + "\n\n".join(partial_summaries)
+            f"[통합 요약 지시]\n아래는 {corp_name}에 대한 부분 요약이야. 공시 내용을 중심으로 정리해줘.\n\n"
+            + "\n\n".join(partial_summaries)
         )
         result = call_vllm(final_prompt)
     else:
