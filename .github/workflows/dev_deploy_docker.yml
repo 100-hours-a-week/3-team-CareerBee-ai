@@ -42,7 +42,7 @@ jobs:
             --repository-name ai-server \
             --region ap-northeast-2 \
             --query "imageDetails[?imageTags!=null && contains(imageTags, 'latest')].imageTags[]" \
-            --output text | tr '\t' '\n' | grep -v '^latest$')
+            --output text | tr '\t' '\n' | grep -v '^${{ env.DEPLOY_TAG }}$')
           echo "🪃 Rollback tag: $ROLLBACK_TAG"
           echo "ROLLBACK_TAG=$ROLLBACK_TAG" >> $GITHUB_ENV
           
