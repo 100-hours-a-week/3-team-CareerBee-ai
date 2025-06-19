@@ -2,40 +2,37 @@ import requests
 from langchain.prompts import FewShotPromptTemplate, PromptTemplate
 from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
-from langchain_community.embeddings import SentenceTransformerEmbeddings
+
+# from langchain_community.embeddings import SentenceTransformerEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from app.utils.text_cleaner import clean_summary
 
-embedding_function = SentenceTransformerEmbeddings(
-    model_name="snunlp/KR-SBERT-V40K-klueNLI-augSTS",
-    model_kwargs={"device": "cpu"}
+embedding_function = HuggingFaceEmbeddings(
+    model_name="snunlp/KR-SBERT-V40K-klueNLI-augSTS", model_kwargs={"device": "cpu"}
 )
 
 chroma = Chroma(
     collection_name="company_issues",
     embedding_function=embedding_function,
-    persist_directory="db/chroma"
+    persist_directory="db/chroma",
 )
 
 examples = [
     {
         "corp_name": "카카오",
         "context": "[공시 정보]\n카카오는 최근 AI 기술을 활용한 신규 서비스를 출시하며 사업 확장을 시도하고 있으며...\n\n[뉴스 정보]\n[2025-06-01] 카카오는 자회사 카카오헬스케어를 통해 의료 AI 사업을 본격화하고 있습니다.",
-        "summary": "카카오는 최근 AI 기술을 접목한 신규 서비스 출시와 의료 분야 자회사인 카카오헬스케어를 통한 사업 확장을 추진하고 있습니다. 공시를 통해 기술 투자에 대한 의지를 밝히며, 시장에서는 해당 전략이 미래 성장 동력으로 주목받고 있습니다."
+        "summary": "카카오는 최근 AI 기술을 접목한 신규 서비스 출시와 의료 분야 자회사인 카카오헬스케어를 통한 사업 확장을 추진하고 있습니다. 공시를 통해 기술 투자에 대한 의지를 밝히며, 시장에서는 해당 전략이 미래 성장 동력으로 주목받고 있습니다.",
     },
     {
         "corp_name": "삼성전자",
         "context": "[공시 정보]\n삼성전자는 반도체 시장의 회복을 기대하며 신규 생산라인 투자 계획을 발표했으며...\n\n[뉴스 정보]\n[2025-06-02] 삼성전자는 美 텍사스에 반도체 공장을 신설하기로 결정했습니다.",
-        "summary": "삼성전자는 반도체 시장의 회복 가능성에 주목하며 미국 텍사스 지역에 신규 공장 설립을 추진하고 있습니다. 이러한 행보는 글로벌 시장 내 경쟁력 강화를 위한 전략으로 해석되고 있으며, 향후 사업 성장에 긍정적 영향을 줄 것으로 기대됩니다."
-    }
+        "summary": "삼성전자는 반도체 시장의 회복 가능성에 주목하며 미국 텍사스 지역에 신규 공장 설립을 추진하고 있습니다. 이러한 행보는 글로벌 시장 내 경쟁력 강화를 위한 전략으로 해석되고 있으며, 향후 사업 성장에 긍정적 영향을 줄 것으로 기대됩니다.",
+    },
 ]
 
 example_template = PromptTemplate(
     input_variables=["corp_name", "context", "summary"],
-    template=(
-        "기업명: {corp_name}\n"
-        "자료:\n{context}\n"
-        "요약:\n{summary}"
-    )
+    template=("기업명: {corp_name}\n" "자료:\n{context}\n" "요약:\n{summary}"),
 )
 
 fewshot_prompt = FewShotPromptTemplate(
@@ -52,13 +49,10 @@ fewshot_prompt = FewShotPromptTemplate(
         "- 500자 이내로 작성해.\n"
         "다음은 예시야:\n"
     ),
-    suffix=(
-        "기업명: {corp_name}\n"
-        "자료:\n{context}\n"
-        "요약:"
-    ),
-    input_variables=["corp_name", "context"]
+    suffix=("기업명: {corp_name}\n" "자료:\n{context}\n" "요약:"),
+    input_variables=["corp_name", "context"],
 )
+
 
 def call_vllm(prompt: str) -> str:
     url = "http://localhost:8001/v1/chat/completions"
@@ -66,15 +60,19 @@ def call_vllm(prompt: str) -> str:
     payload = {
         "model": "CohereLabs/aya-expanse-8b",
         "messages": [
-            {"role": "system", "content": "너는 취준생을 위한 한국어 기업 분석 요약 도우미야."},
+            {
+                "role": "system",
+                "content": "너는 취준생을 위한 한국어 기업 분석 요약 도우미야.",
+            },
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.3,
-        "max_tokens": 1024
+        "max_tokens": 1024,
     }
     resp = requests.post(url, headers=headers, json=payload)
     resp.raise_for_status()
     return resp.json()["choices"][0]["message"]["content"]
+
 
 def has_batchim(korean_word: str) -> bool:
     if not korean_word:
@@ -85,16 +83,16 @@ def has_batchim(korean_word: str) -> bool:
         return (code - 0xAC00) % 28 != 0
     return False
 
+
 def generate_latest_issue(corp_name: str, return_docs: bool = False):
     queries = ["채용 전략", "인사 정책", "조직 개편", "미래 성장성", "시장 경쟁력"]
 
     all_data = chroma.get(include=["metadatas", "documents"])
     report_doc_obj = None
-    for meta, doc in zip(all_data['metadatas'], all_data['documents']):
+    for meta, doc in zip(all_data["metadatas"], all_data["documents"]):
         if meta.get("corp") == corp_name and meta.get("type") == "report":
             report_doc_obj = Document(
-                page_content=doc,
-                metadata={"type": "report", "corp": corp_name}
+                page_content=doc, metadata={"type": "report", "corp": corp_name}
             )
             break
 
@@ -103,12 +101,7 @@ def generate_latest_issue(corp_name: str, return_docs: bool = False):
         result = chroma.similarity_search(
             q,
             k=3,
-            filter={
-                "$and": [
-                    {"corp": {"$eq": corp_name}},
-                    {"type": {"$eq": "news"}}
-                ]
-            }
+            filter={"$and": [{"corp": {"$eq": corp_name}}, {"type": {"$eq": "news"}}]},
         )
         news_docs.extend(result)
 
@@ -143,10 +136,17 @@ def generate_latest_issue(corp_name: str, return_docs: bool = False):
 
     MAX_LEN = 4000
     if len(context) > MAX_LEN:
-        chunks = [context[i:i+MAX_LEN] for i in range(0, len(context), MAX_LEN)]
-        partial_summaries = [call_vllm(fewshot_prompt.format(corp_name=corp_name, context=chunk)) for chunk in chunks]
-        merged_context = "\n\n".join([f"부분 요약 {i+1}: {s}" for i, s in enumerate(partial_summaries)])
-        final_prompt = fewshot_prompt.format(corp_name=corp_name, context=merged_context)
+        chunks = [context[i : i + MAX_LEN] for i in range(0, len(context), MAX_LEN)]
+        partial_summaries = [
+            call_vllm(fewshot_prompt.format(corp_name=corp_name, context=chunk))
+            for chunk in chunks
+        ]
+        merged_context = "\n\n".join(
+            [f"부분 요약 {i+1}: {s}" for i, s in enumerate(partial_summaries)]
+        )
+        final_prompt = fewshot_prompt.format(
+            corp_name=corp_name, context=merged_context
+        )
         result = call_vllm(final_prompt)
     else:
         prompt = fewshot_prompt.format(corp_name=corp_name, context=context)
