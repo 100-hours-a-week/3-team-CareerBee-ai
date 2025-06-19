@@ -2,11 +2,14 @@
 
 import requests
 from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import SentenceTransformerEmbeddings
+
+# from langchain_community.embeddings import SentenceTransformerEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
+
 from langchain_core.documents import Document
 
 # 1️⃣ 임베딩 함수 준비
-embedding_function = SentenceTransformerEmbeddings(
+embedding_function = HuggingFaceEmbeddings(
     model_name="snunlp/KR-SBERT-V40K-klueNLI-augSTS"
 )
 
