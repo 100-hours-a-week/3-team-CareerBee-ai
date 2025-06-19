@@ -41,8 +41,9 @@ jobs:
           ROLLBACK_TAG=$(aws ecr describe-images \
             --repository-name ai-server \
             --region ap-northeast-2 \
-            --query "imageDetails[?imageTags!=null && contains(imageTags, '${{ env.DEPLOY_TAG }}')].imageTags[]" \
-            --output text | tr '\t' '\n' | grep -v '${{ env.DEPLOY_TAG }}')
+            --query "imageDetails[?imageTags!=null] | [?contains(imageTags, '${{ env.DEPLOY_TAG }}') == \`false\`] \
+              | sort_by(@, &imagePushedAt) | [-1].imageTags[0]" \
+            --output text)
           echo "🪃 Rollback tag: $ROLLBACK_TAG"
           echo "ROLLBACK_TAG=$ROLLBACK_TAG" >> $GITHUB_ENV
           
@@ -109,6 +110,15 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.DEV_WEBHOOK_TOKEN }}" \
             -H "Content-Type: application/json" \
             -d '{"ai_server_tag": "${{ env.ROLLBACK_TAG }}"}'
+
+          echo "🧹 ECR에서 태그 '${{ env.DEPLOY_TAG }}' 이미지 삭제 중..."
+
+          aws ecr batch-delete-image \
+            --repository-name ai-server \
+            --region ap-northeast-2 \
+            --image-ids imageTag=${{ env.DEPLOY_TAG }}
+
+          echo "✅ 이미지 삭제 완료"
 
       - name: Notify Discord
         if: always()
