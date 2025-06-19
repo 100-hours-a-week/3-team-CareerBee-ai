@@ -36,12 +36,12 @@ jobs:
         with:
           registry: ${{ secrets.DEV_ECR_REGISTRY }}
 
-      - name: Get current tag for latest (for rollback)
+      - name: Get current tag for DEPLOY_TAG (for rollback)
         run: |
           ROLLBACK_TAG=$(aws ecr describe-images \
             --repository-name ai-server \
             --region ap-northeast-2 \
-            --query "imageDetails[?imageTags!=null && contains(imageTags, 'latest')].imageTags[]" \
+            --query "imageDetails[?imageTags!=null && contains(imageTags, '${{ env.DEPLOY_TAG }}')].imageTags[]" \
             --output text | tr '\t' '\n' | grep -v '^${{ env.DEPLOY_TAG }}$')
           echo "🪃 Rollback tag: $ROLLBACK_TAG"
           echo "ROLLBACK_TAG=$ROLLBACK_TAG" >> $GITHUB_ENV
