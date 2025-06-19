@@ -11,12 +11,14 @@ async def extract_resume(request: ResumeExtractRequest):
         result = await extract_resume_info(request.file_url)
         return ResumeExtractResponse(message="extraction_success", data=result)
     except ValueError as ve:
+        # LLM 추론/파싱 실패 등
         raise HTTPException(status_code=500, detail={
             "message": "llm_response_decode_failed",
-            "data": str(ve)
+            "error_detail": str(ve)
         })
     except Exception:
+        # PDF 자체 문제 등
         raise HTTPException(status_code=400, detail={
             "message": "invalid_file_type",
-            "data": None
+            "error_detail": None
         })

@@ -4,6 +4,6 @@ import requests
 router = APIRouter()
 
 
-@router.get("/health")
+@router.get("/health-check")
 def health_check():
     return {"status": "ok"}

@@ -10,6 +10,8 @@ jobs:
 
     env:
       COMMIT_HASH: ${{ github.sha }}
+      ECR_REPOSITORY: ${{ secrets.PROD_ECR_URI }}
+      ECR_REGION: ap-northeast-2
 
     steps:
       - name: Checkout code
@@ -18,21 +20,24 @@ jobs:
       - name: google auth
         uses: google-github-actions/auth@v1
         with:
-          credentials_json: "${{ secrets.GCP_SA_KEY }}"
+          credentials_json: "${{ secrets.PROD_GCP_SA_KEY }}"
 
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ secrets.PROD_GCP_PROJECT_ID }}
 
-      - name: Set timestamp-based path (Asia/Seoul)
+      - name: Set timestamp-based image tag (Asia/Seoul)
         run: |
-          TIMESTAMP=$(TZ='Asia/Seoul' date +%Y-%m-%d_%H_%M_%S)
-          echo "DEPLOY_PATH=${TIMESTAMP}_${COMMIT_HASH}" >> $GITHUB_ENV
+          TIMESTAMP=$(TZ='Asia/Seoul' date +%Y%m%d-%H%M%S)
+          echo "IMAGE_TAG=${TIMESTAMP}-${COMMIT_HASH}" >> $GITHUB_ENV
 
       - name: Create .env file
         run: |
           echo "${{ secrets.ENV_FILE_CONTENTS }}" > .env
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -41,24 +46,44 @@ jobs:
           aws-secret-access-key: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
 
-      - name: Upload build to S3
-        run: |
-          mkdir -p ./deploy-ai
-          cp -r ./fastapi_project/* ./deploy-ai/
-          cp .env ./deploy-ai/.env
-          echo "Uploading to: s3://${{ secrets.PROD_S3_BUCKET_NAME }}/artifacts/ai/$DEPLOY_PATH"
-          aws s3 cp ./deploy-ai "s3://${{ secrets.PROD_S3_BUCKET_NAME }}/artifacts/ai/$DEPLOY_PATH/" --recursive
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Setup SSH key
+      - name: Build and push Docker image to ECR
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.PROD_GCE_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.PROD_GCE_HOST }} >> ~/.ssh/known_hosts
+          BASE_IMAGE=${{ steps.login-ecr.outputs.registry }}/careerbee-ai-base:latest
+          docker build \
+            --build-arg BASE_IMAGE_URI=$BASE_IMAGE \
+            -t $ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: Trigger remote deploy script on GCE
+      - name: Copy .env to GCE instance using IAP
         run: |
-          ssh ${{ secrets.PROD_GCE_USER }}@${{ secrets.PROD_GCE_HOST }} "bash ~/release/deploy-ai.sh $DEPLOY_PATH"
+          gcloud compute scp .env ${{ secrets.PROD_GCE_USER }}@${{ secrets.PROD_GCE_INSTANCE_NAME }}:/home/ssmu-morgan/ai/.env \
+            --zone=${{ secrets.PROD_GCE_ZONE }} \
+            --tunnel-through-iap
+
+      - name: Trigger remote deploy on GCE using IAP
+        run: |
+          gcloud compute ssh ${{ secrets.PROD_GCE_USER }}@${{ secrets.PROD_GCE_INSTANCE_NAME }} \
+            --zone=${{ secrets.PROD_GCE_ZONE }} \
+            --tunnel-through-iap \
+            --command="bash -c '
+              set -e
+              aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
+              docker stop careerbee-ai || true
+              docker rm careerbee-ai || true
+              docker pull ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+              docker run -d \
+                --name careerbee-ai \
+                --env-file /home/ssmu-morgan/ai/.env \
+                -p 8000:8000 \
+                --restart=always \
+                -v /home/ssmu-morgan/ai:/app \
+                ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+            '"
 
       - name: Notify Discord on Success
         if: success()
