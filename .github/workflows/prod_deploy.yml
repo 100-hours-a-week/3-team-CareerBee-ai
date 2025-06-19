@@ -20,7 +20,7 @@ jobs:
       - name: google auth
         uses: google-github-actions/auth@v1
         with:
-          credentials_json: "${{ secrets.GCP_SA_KEY }}"
+          credentials_json: "${{ secrets.PROD_GCP_SA_KEY }}"
 
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
@@ -59,39 +59,31 @@ jobs:
           docker tag $ECR_REPOSITORY:$IMAGE_TAG ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
           docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: Setup SSH key
+      - name: Copy .env to GCE instance using IAP
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.PROD_GCE_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.PROD_GCE_HOST }} >> ~/.ssh/known_hosts
+          gcloud compute scp .env ${{ secrets.PROD_GCE_USER }}@${{ secrets.PROD_GCE_INSTANCE_NAME }}:/home/ssmu-morgan/ai/.env \
+            --zone=${{ secrets.PROD_GCE_ZONE }} \
+            --tunnel-through-iap
 
-      - name: Copy .env to GCE instance
+      - name: Trigger remote deploy on GCE using IAP
         run: |
-          scp -i ~/.ssh/id_rsa .env ${{ secrets.PROD_GCE_USER }}@${{ secrets.PROD_GCE_HOST }}:/home/ssmu-morgan/ai/.env
-
-      - name: Trigger remote deploy script on GCE (docker run)
-        run: |
-          ssh ${{ secrets.PROD_GCE_USER }}@${{ secrets.PROD_GCE_HOST }} <<EOF
-            set -e
-            aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
-            # 기존 ai 컨테이너 중지 및 삭제 (실행 중이면)
-            docker stop careerbee-ai || true
-            docker rm careerbee-ai || true
-
-            # 최신 이미지 pull (로그인 생략 가능: 이미 public or 로그인 완료된 상태면)
-            docker pull ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
-
-            # 새 컨테이너 실행 (PORT, VOLUME, ENV 등에 맞춰 수정)
-            docker run -d \
-              --name careerbee-ai \
-              --env-file /home/ssmu-morgan/ai/.env \
-              -p 8000:8000 \
-              --restart=always \
-              -v /home/ssmu-morgan/ai:/app \
-              ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
-
-          EOF
+          gcloud compute ssh ${{ secrets.PROD_GCE_USER }}@${{ secrets.PROD_GCE_INSTANCE_NAME }} \
+            --zone=${{ secrets.PROD_GCE_ZONE }} \
+            --tunnel-through-iap \
+            --command="bash -c '
+              set -e
+              aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
+              docker stop careerbee-ai || true
+              docker rm careerbee-ai || true
+              docker pull ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+              docker run -d \
+                --name careerbee-ai \
+                --env-file /home/ssmu-morgan/ai/.env \
+                -p 8000:8000 \
+                --restart=always \
+                -v /home/ssmu-morgan/ai:/app \
+                ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+            '"
 
       - name: Notify Discord on Success
         if: success()
