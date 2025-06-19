@@ -1,17 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import TypedDict, Dict, List
-
-
-class InputsModel(BaseModel):  # 사용자 초기 입력의 내부 필드 모델 (pydantic model)
-    email: str
-    preferred_job: str
-    certification_count: int
-    project_count: int
-    major_type: str
-    company_name: str
-    position: str
-    work_period: int
-    additional_experiences: str
+from app.schemas.resume_agent import InputsModel
 
 
 class ResumeAgentState(BaseModel):
@@ -23,6 +12,9 @@ class ResumeAgentState(BaseModel):
     docx_path: str = ""
     asked_count: int = 0
     info_ready: bool = False
+
+    # UI 분기용 step 필드 추가
+    step: str = Field(default="questioning")
 
 
 class ResumeAgentInitRequest(BaseModel):
