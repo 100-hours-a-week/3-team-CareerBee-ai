@@ -79,7 +79,7 @@ jobs:
       - name: Trigger Deploy Webhook
         if: env.DISCORD_MSG != 'webhook_failure'
         run: |
-          curl -X POST https://webhook.dev.careerbee.co.kr/deploy \
+          curl --max-time 300 -X POST https://webhook.dev.careerbee.co.kr/deploy \
             -H "Authorization: Bearer ${{ secrets.DEV_WEBHOOK_TOKEN }}" \
             -H "Content-Type: application/json" \
             -d '{"ai_server_tag": "latest"}'
