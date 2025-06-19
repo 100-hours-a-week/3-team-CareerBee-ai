@@ -9,6 +9,7 @@ from app.agents.graph.resume_agent import build_resume_agent
 from app.agents.schema.resume_create_agent import ResumeAgentState
 from app.schemas.resume_agent import ResumeAgentInitRequest, ResumeAgentRequest
 from app.agents.nodes.generate_question import generate_question_node
+from fastapi.encoders import jsonable_encoder
 
 # 로깅 기본 설정
 logging.basicConfig(
@@ -42,14 +43,8 @@ async def initialize_resume_stream(payload: ResumeAgentInitRequest):
 
     updated_state = generate_question_node(initial_state)
 
-    return {
-        "resume": updated_state.resume,
-        "docx_path": updated_state.docx_path,
-        "answers": updated_state.answers,
-        "pending_questions": updated_state.pending_questions,
-        "info_ready": updated_state.info_ready,
-        "asked_count": updated_state.asked_count,
-    }
+    # 예시: update 함수에서의 반환
+    return jsonable_encoder(updated_state)
 
 
 # # 3️⃣ 공통 응답 포맷 생성 함수
