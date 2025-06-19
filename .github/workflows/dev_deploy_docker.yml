@@ -117,7 +117,7 @@ jobs:
           aws ecr batch-delete-image \
             --repository-name ai-server \
             --region ap-northeast-2 \
-            --image-ids imageTag=${{ env.DEPLOY_TAG }}
+            --image-ids imageTag=${{ env.DEPLOY_TAG }} imageTag=latest
 
           echo "✅ 이미지 삭제 완료"
 
