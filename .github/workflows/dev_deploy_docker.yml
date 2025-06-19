@@ -41,7 +41,8 @@ jobs:
           ROLLBACK_TAG=$(aws ecr describe-images \
             --repository-name ai-server \
             --region ap-northeast-2 \
-            --query "imageDetails[?imageTags!=null] | [?contains(imageTags, '${{ env.DEPLOY_TAG }}') == \`false\`] \
+            --query "imageDetails[?imageTags!=null] | [?(!contains(imageTags, '${{ env.DEPLOY_TAG }}') && \
+              !contains(imageTags, 'latest') && !contains(imageTags, 'cache'))] \
               | sort_by(@, &imagePushedAt) | [-1].imageTags[0]" \
             --output text)
           echo "🪃 Rollback tag: $ROLLBACK_TAG"
