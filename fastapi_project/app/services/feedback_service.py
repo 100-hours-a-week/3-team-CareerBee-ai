@@ -3,7 +3,7 @@ import requests
 import time
 
 VLLM_URL = os.getenv("VLLM_URL", "http://localhost:8001")
-MODEL_NAME = "/home/kej0202/aya-expanse-8b"
+MODEL_NAME = "/mnt/ssd/aya-expanse-8b"
 
 
 def build_feedback_prompt(question: str, answer: str) -> str:
@@ -49,10 +49,7 @@ def build_feedback_prompt(question: str, answer: str) -> str:
         "피드백:"
     )
 
-    return (
-        f"{few_shot_prompt}"
-        f"{user_prompt}"
-    )
+    return f"{few_shot_prompt}" f"{user_prompt}"
 
 
 def generate_feedback(question: str, answer: str) -> str:
@@ -69,15 +66,11 @@ def generate_feedback(question: str, answer: str) -> str:
                 "model": MODEL_NAME,
                 "messages": [
                     {
-                        "role": "system", 
-                        "content": "당신은 컴퓨터공학 면접관입니다. "
+                        "role": "system",
+                        "content": "당신은 컴퓨터공학 면접관입니다. 당신이 질문한 컴퓨터공학 개념에 대해 지원자의 답변을 보고 어떤 점이 보완되면 좋겠는지 친절하게 피드백해주세요.",
                         # "아래는 예시 질문과 답변, 그리고 그에 대한 피드백입니다."
-                        "당신이 질문한 컴퓨터공학 개념에 대해 지원자의 답변을 보고 어떤 점이 보완되면 좋겠는지 친절하게 피드백해주세요."
-                     },
-                    {
-                        "role": "user", 
-                        "content": prompt
-                    }
+                    },
+                    {"role": "user", "content": prompt},
                 ],
                 "max_tokens": 512,
                 "temperature": 0.7,
