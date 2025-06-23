@@ -1,5 +1,5 @@
-import requests
 import os
+import requests
 import time
 
 VLLM_URL = os.getenv("VLLM_URL", "http://localhost:8001")
@@ -56,11 +56,12 @@ def generate_feedback(question: str, answer: str) -> str:
     prompt = build_feedback_prompt(question, answer)
 
     try:
-        print("VLLM_URL:", os.getenv("VLLM_URL"))
+        print("VLLM_URL:", VLLM_URL)
         start_time = time.time()
 
         response = requests.post(
-            f"{VLLM_URL}/v1/completions",
+            f"{VLLM_URL}/v1/chat/completions",
+            headers={"Content-Type": "application/json"},
             json={
                 "model": MODEL_NAME,
                 "messages": [
@@ -74,15 +75,15 @@ def generate_feedback(question: str, answer: str) -> str:
                 "max_tokens": 512,
                 "temperature": 0.7,
             },
-            # timeout=30,
+            timeout=30,
         )
 
         end_time = time.time()
         elapsed = round(end_time - start_time, 2)
         print(f"응답 시간: {elapsed}초")
-
         response.raise_for_status()
-        return response.json()["choices"][0]["text"].strip()
+
+        return response.json()["choices"][0]["message"]["content"].strip()
 
     except requests.exceptions.RequestException as e:
         return f"피드백 생성 중 오류 발생: {str(e)}"
