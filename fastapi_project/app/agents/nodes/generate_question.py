@@ -1,9 +1,10 @@
 from langchain_openai import ChatOpenAI
+from app.agents.schema.resume_create_agent import ResumeAgentState
 
 llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.3)
 
 
-def generate_question_node(state):
+async def generate_question_node(state: ResumeAgentState):
 
     # 최대 3번까지만 질문
     if state.asked_count >= 3:
@@ -44,15 +45,16 @@ def generate_question_node(state):
     {context}
     """
 
-    response_content = llm.invoke(prompt).content
+    response_obj = await llm.ainvoke(prompt)
+    response_content = (
+        response_obj.content.strip() if hasattr(response_obj, "content") else "없음"
+    )
     print(f"Response content: {response_content}")  # 반환값 출력
 
-    response = response_content.strip() if isinstance(response_content, str) else "없음"
-
-    if response == "없음":
+    if response_content == "없음":
         state.info_ready = True
         state.pending_questions = []
     else:
-        state.pending_questions = [response]
+        state.pending_questions = [response_content]
 
     return state
