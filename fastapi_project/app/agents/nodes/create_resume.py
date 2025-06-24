@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+import asyncio
 from langchain_openai import ChatOpenAI
 from app.agents.schema.resume_create_agent import ResumeAgentState
 from docx import Document
@@ -52,9 +53,7 @@ def render_llm_content_stylized(markdown_text: str, doc: Document):
             doc.add_paragraph("▪ " + element.get_text())
 
 
-def create_resume_node(state: ResumeAgentState):
-    doc = Document()
-    doc.add_heading("이력서", level=0).alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
+async def create_resume_node(state: ResumeAgentState) -> ResumeAgentState:
 
     inputs = state.inputs
     answers = state.answers
@@ -85,22 +84,28 @@ def create_resume_node(state: ResumeAgentState):
 """
 
     # ▶ LLM 응답
-    content = llm.invoke(prompt).content.strip()
+    content = await asyncio.to_thread(llm.invoke, prompt)
+    content = content.content.strip()
 
-    # ✍ 기본 정보는 기존 스타일로 작성
-    doc.add_heading("기본 정보", level=1)
-    doc.add_paragraph(f"이메일: {inputs.email}")
-    doc.add_paragraph(f"희망 직무: {inputs.preferred_job}")
-    doc.add_paragraph(f"전공 여부: {inputs.major_type}")
+    def write_to_doc():
+        doc = Document()
+        doc.add_heading("이력서", level=0).alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
 
-    # ✨ LLM 응답 기반 섹션
-    render_llm_content_stylized(content, doc)
+        # ✍ 기본 정보는 기존 스타일로 작성
+        doc.add_heading("기본 정보", level=1)
+        doc.add_paragraph(f"이메일: {inputs.email}")
+        doc.add_paragraph(f"희망 직무: {inputs.preferred_job}")
+        doc.add_paragraph(f"전공 여부: {inputs.major_type}")
+
+        # ✨ LLM 응답 기반 섹션
+        render_llm_content_stylized(content, doc)
+
+        os.makedirs("generated", exist_ok=True)
+        doc.save(path)
 
     # 저장
-    filename = f"resume_final_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
-    os.makedirs("generated", exist_ok=True)
-    path = os.path.join("generated", filename)
-    doc.save(path)
+    path = f"generated/resume_final_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
+    await asyncio.to_thread(write_to_doc)
 
     state.docx_path = path
     state.resume = content

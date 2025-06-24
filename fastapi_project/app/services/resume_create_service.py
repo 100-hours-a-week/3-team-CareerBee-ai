@@ -13,14 +13,13 @@ import asyncio
 from app.utils.upload_file_to_s3 import upload_file_to_s3
 
 
+# ------------------------- 스타일 관련 도우미 함수들 -------------------------
 # 구분선 넣기 함수
 def add_horizontal_line(paragraph, before=6, after=6):
-    # paragraph는 이미 Paragraph 객체임
     paragraph.paragraph_format.space_before = Pt(before)
     paragraph.paragraph_format.space_after = Pt(after)
 
     pPr = paragraph._p.get_or_add_pPr()
-
     border = OxmlElement("w:pBdr")
     bottom = OxmlElement("w:bottom")
     bottom.set(qn("w:val"), "single")  # 실선
@@ -40,15 +39,13 @@ def add_underlined_paragraph(doc, label: str, length: int = 40):
     run.font.size = Pt(11)
 
 
+# ------------------------- 이력서 생성 핵심 로직 -------------------------
 def _generate_resume_doc(data: ResumeCreateRequest) -> BytesIO:
     doc = Document()
 
     # 제목
     doc.add_heading("OOO 이력서", level=0).alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
-
-    # 기본 정보
-    heading_paragraph = doc.add_heading("기본 정보", level=1)
-
+    doc.add_heading("기본 정보", level=1)
     doc.add_paragraph(f"지원 분야: {data.preferred_job}")
     doc.add_paragraph("생년월일:")
     doc.add_paragraph(f"이메일: {data.email}")
@@ -71,7 +68,6 @@ def _generate_resume_doc(data: ResumeCreateRequest) -> BytesIO:
             years = data.work_period // 12
             months = data.work_period % 12
             period_text = f"{years}년 {months}개월" if months > 0 else f"{years}년"
-
         add_underlined_paragraph(doc, f"회사명: {data.company_name}")
         if data.position:
             doc.add_paragraph(f"직무명: {data.position}")
@@ -83,7 +79,6 @@ def _generate_resume_doc(data: ResumeCreateRequest) -> BytesIO:
     # 프로젝트 경험
     heading_paragraph = doc.add_heading("프로젝트", level=1)
     add_horizontal_line(heading_paragraph)  # 구분선
-
     for i in range(data.project_count):
         doc.add_paragraph(f"[프로젝트 {i + 1} 제목]")
         add_underlined_paragraph(doc, "기간", 40)
@@ -98,7 +93,6 @@ def _generate_resume_doc(data: ResumeCreateRequest) -> BytesIO:
     # 자격증
     heading_paragraph = doc.add_heading("자격증", level=1)
     add_horizontal_line(heading_paragraph)  # 구분선
-
     for i in range(data.certification_count):
         add_underlined_paragraph(doc, f"▪ ", 50)
 
@@ -113,37 +107,30 @@ def _generate_resume_doc(data: ResumeCreateRequest) -> BytesIO:
     return byte_io
 
 
-# 저장
+# ------------------------- 외부 호출용 async 함수들 -------------------------
 async def generate_resume_draft(data: ResumeCreateRequest) -> str:
-    await asyncio.sleep(1)
-
-    # filename 생성
     filename = f"resume_prompt_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
 
-    # docx 생성 (in-memory)
+    # docx 생성 (비동기 스레드 오프로드)
     byte_stream = await asyncio.to_thread(_generate_resume_doc, data)
 
-    # S3 업로드
+    # S3 업로드 오프로드
     s3_file_path = f"resume/{filename}"
-    file_url = upload_file_to_s3(byte_stream, s3_file_path)
+    file_url = await asyncio.to_thread(upload_file_to_s3, byte_stream, s3_file_path)
 
     return file_url
 
 
-# Agent resume saving util (from agent-generated text)
 async def save_agent_resume_to_docx(state: ResumeAgentState) -> str:
-    await asyncio.sleep(1)
-
     filename = f"resume_agent_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
     save_dir = "./generated_resumes"
     os.makedirs(save_dir, exist_ok=True)
     filepath = os.path.join(save_dir, filename)
 
-    # Run create_resume and get updated state
-    updated_state = create_resume_node(state)
-    resume_text = updated_state.get("resume", "")
-
+    # LLM 결과 생성 + 저장 로직도 오프로드
     def _write_to_docx():
+        updated_state = create_resume_node(state)
+        resume_text = updated_state.get("resume", "")
         doc = Document()
         for line in resume_text.split("\n"):
             doc.add_paragraph(line)

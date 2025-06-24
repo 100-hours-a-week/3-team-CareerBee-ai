@@ -1,5 +1,7 @@
 # app_ui.py
 import streamlit as st
+import httpx
+import asyncio
 import requests
 from copy import deepcopy
 from app.schemas.resume_agent import InputsModel
