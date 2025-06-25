@@ -51,7 +51,7 @@ prompt = ChatPromptTemplate.from_messages([
 
 # 3. 모델 정의
 llm = ChatOpenAI(
-    model="CohereLabs/aya-expanse-8b",
+    model="/mnt/ssd/aya-expanse-8b",
     openai_api_base="http://localhost:8001/v1",
     openai_api_key="NULL",
     temperature=0.3,
