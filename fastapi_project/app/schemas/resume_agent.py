@@ -25,7 +25,7 @@ class ResumeAgentInitRequest(
 class ResumeAgentRequest(
     BaseModel
 ):  # 전체 LangGraph state를 관리하는 메인 모델 (pydantic model)
-    inputs: Union[InputsModel, dict]
+    inputs: InputsModel
     user_inputs: Dict = Field(default_factory=dict)
     answers: List[Dict] = Field(default_factory=list)
     pending_questions: List[str] = Field(default_factory=list)

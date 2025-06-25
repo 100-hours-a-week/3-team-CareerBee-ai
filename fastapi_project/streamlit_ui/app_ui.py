@@ -3,19 +3,20 @@ import streamlit as st
 import requests
 from copy import deepcopy
 from app.schemas.resume_agent import InputsModel
+import os
 
 BASE_URL = "http://localhost:8000"  # FastAPI 서버 주소
 
-st.title("LangGraph 이력서 생성 테스트")
+
+def ensure_inputs_dict(inputs):
+    if not isinstance(inputs, dict):
+        return InputsModel(**inputs).model_dump()
+    return inputs
+
 
 # 상태 저장 초기화 (state dict 관리 → 안정화)
 if "state" not in st.session_state:
-    """
-    streamlit 세션이 새로 시작될 때마다 state 초기값을 세팅
-    이게 없다면 사용자가 처음 들어올 때 st.session_state.state가 존재하지 않아서 KeyError 발생
-    초기화 안 해주면 상태관리가 불안정해짐
-    """
-    st.session_state.state = {
+    st.session_state["state"] = {
         "inputs": {},
         "user_inputs": {},
         "answers": [],
@@ -24,33 +25,29 @@ if "state" not in st.session_state:
         "docx_path": "",
         "info_ready": False,
         "asked_count": 0,
+        "step": "init",
     }
+state = st.session_state["state"]
+step = state.get("step", "init")  # 방어적 접근
 
-# ✅ 초기 사용자 정보 입력 단계
-if not st.session_state.state["inputs"]:
+st.title("LangGraph 이력서 생성 테스트")
+
+
+# 1️⃣ 초기 사용자 정보 입력 단계
+if step == "init":
     with st.form("init_form"):
-        email = st.text_input("이메일", key="email_input")
-        preferred_job = st.text_input("선호 직무", key="preferred_job_input")
-        certification_count = st.number_input(
-            "자격증 개수", min_value=0, step=1, key="cert_count_input"
-        )
-        project_count = st.number_input(
-            "프로젝트 개수", min_value=0, step=1, key="proj_count_input"
-        )
-        major_type = st.selectbox(
-            "전공 여부", ["MAJOR", "NON_MAJOR"], key="major_type_input"
-        )
-        company_name = st.text_input("재직 회사", key="company_name_input")
-        position = st.text_input("직무", key="position_input")
-        work_period = st.number_input("재직 기간", min_value=0, key="work_period_input")
-        additional_experience = st.text_input(
-            "추가 경험이 있다면 알려주세요.", key="add_exp_input"
-        )
-        submitted = st.form_submit_button("이력서 생성")
+        email = st.text_input("이메일")
+        preferred_job = st.text_input("선호 직무")
+        certification_count = st.number_input("자격증 개수", min_value=0, step=1)
+        project_count = st.number_input("프로젝트 개수", min_value=0, step=1)
+        major_type = st.selectbox("전공 여부", ["MAJOR", "NON_MAJOR"])
+        company_name = st.text_input("재직 회사")
+        position = st.text_input("직무")
+        work_period = st.number_input("재직 기간", min_value=0)
+        additional_experience = st.text_input("추가 경험이 있다면 알려주세요.")
 
-        if submitted:
-            # 입력값 수집
-            st.session_state.state["inputs"] = {
+        if st.form_submit_button("이력서 생성"):
+            inputs = {
                 "email": email,
                 "preferred_job": preferred_job,
                 "certification_count": int(certification_count),
@@ -61,61 +58,88 @@ if not st.session_state.state["inputs"]:
                 "work_period": int(work_period),
                 "additional_experiences": additional_experience,
             }
-            # 서버 호출
-            response = requests.post(
-                f"{BASE_URL}/resume/agent/init",
-                json={"inputs": st.session_state.state["inputs"]},
-            )
+
+            try:
+                response = requests.post(
+                    f"{BASE_URL}/resume/agent/init", json={"inputs": inputs}
+                )
+                response.raise_for_status()
+                result = response.json()
+                result["inputs"] = ensure_inputs_dict(result["inputs"])
+                result["step"] = "questioning"
+                st.session_state["state"] = result
+                st.rerun()
+            except Exception as e:
+                st.error(f"초기 요청 실패: {e}")
+
+# 2️⃣ 질문-답변 반복 단계
+elif step == "questioning":
+    pending = state.get("pending_questions", [])
+    if not pending:
+        payload = deepcopy(state)
+        payload["inputs"] = ensure_inputs_dict(payload["inputs"])
+
+        try:
+            response = requests.post(f"{BASE_URL}/resume/agent/update", json=payload)
+            response.raise_for_status()
             result = response.json()
-            st.session_state.state.update(result)
+            result["inputs"] = ensure_inputs_dict(result["inputs"])
+            result["step"] = "questioning"
+            st.session_state["state"] = result
+            st.rerun()
+        except Exception as e:
+            st.error(f"질문 생성 중 오류 발생: {e}")
 
-# ✅ LangGraph 질문-답변 반복 단계
-if st.session_state.state["inputs"] and not st.session_state.state["resume"]:
-
-    pending = st.session_state.state.get("pending_questions", [])
-
-    if pending:
+    else:
         current_question = pending[0]
         st.write(f"🤖 질문: {current_question}")
 
-        # 핵심 안정화: 위젯 key 부여
         user_answer = st.text_input(
-            "답변을 입력하세요:",
-            key=f"user_answer_{st.session_state.state['asked_count']}",
+            "답변을 입력하세요:", key=f"user_answer_{state['asked_count']}"
         )
 
         if st.button("답변 전송"):
-            # 답변 누적
-            st.session_state.state["user_inputs"][current_question] = user_answer
-            st.session_state.state["answers"].append(
+            state["user_inputs"][current_question] = user_answer
+            state["answers"].append(
                 {"question": current_question, "answer": user_answer}
             )
-            st.session_state.state["pending_questions"] = pending[1:]  # pop
+            state["pending_questions"] = pending[1:]
+            state["asked_count"] += 1
 
-            # dict로 확실히 직렬화
-            payload = deepcopy(st.session_state.state)
+            payload = deepcopy(state)
+            payload["inputs"] = ensure_inputs_dict(payload["inputs"])
 
-            if isinstance(payload["inputs"], InputsModel):
-                payload["inputs"] = payload["inputs"].dict()
+            try:
+                response = requests.post(
+                    f"{BASE_URL}/resume/agent/update", json=payload
+                )
+                response.raise_for_status()
+                result = response.json()
+                result["inputs"] = ensure_inputs_dict(result["inputs"])
+                result["step"] = (
+                    "completed" if result.get("info_ready") else "questioning"
+                )
+                st.session_state["state"] = result
+                st.rerun()
+            except Exception as e:
+                st.error(f"답변 처리 실패: {e}")
 
-            response = requests.post(
-                "/resume/agent/update",
-                json=payload,  # FastAPI가 JSON → dict로 자동 역직렬화
-            )
+# 3️⃣ 이력서 생성 완료 단계
+elif step == "completed":
+    docx_path = state.get("docx_path")
+    st.write("📁 DEBUG - docx_path:", docx_path)
 
-            st.session_state.state.update(response.json())
-
-
-# ✅ 이력서 생성 완료 시
-if st.session_state.state.get("resume"):
-    st.success("이력서 생성이 완료되었습니다!")
-    st.code(st.session_state.state["resume"])
-
-    if st.session_state.state.get("docx_path"):
-        with open(st.session_state.state["docx_path"], "rb") as file:
+    if not docx_path:
+        st.warning("docx_path가 비어 있습니다.")
+    elif not os.path.exists(docx_path):
+        st.error(f"❌ 파일이 존재하지 않습니다: {docx_path}")
+    else:
+        st.success("이력서 생성이 완료되었습니다!")
+        st.code(state.get("resume", ""))
+        with open(docx_path, "rb") as file:
             st.download_button(
                 label="📥 이력서 다운로드",
                 data=file,
-                file_name=st.session_state.state["docx_path"].split("/")[-1],
+                file_name=os.path.basename(docx_path),
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             )
