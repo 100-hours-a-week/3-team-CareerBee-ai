@@ -64,7 +64,7 @@ def call_vllm(prompt: str) -> str:
     url = "http://localhost:8001/v1/chat/completions"
     headers = {"Content-Type": "application/json"}
     payload = {
-        "model": "CohereLabs/aya-expanse-8b",
+        "model": "/mnt/ssd/aya-expanse-8b",
         "messages": [
             {"role": "system", "content": "너는 취준생을 위한 한국어 기업 분석 요약 도우미야."},
             {"role": "user", "content": prompt},
