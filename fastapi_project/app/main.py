@@ -1,4 +1,5 @@
 # main.py
+import sys
 import logging  # ✅ 로깅 임포트 추가
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -23,7 +24,8 @@ import traceback
 # ✅ 전역 로깅 설정 추가
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+    stream=sys.stdout
 )
 
 # 환경변수 로드
