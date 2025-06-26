@@ -1,3 +1,5 @@
+# main.py
+import logging  # ✅ 로깅 임포트 추가
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -18,6 +20,12 @@ from pytz import timezone
 from dotenv import load_dotenv
 import traceback
 
+# ✅ 전역 로깅 설정 추가
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+)
+
 # 환경변수 로드
 load_dotenv(override=True)
 
@@ -34,7 +42,6 @@ scheduler.add_job(
 )
 scheduler.start()
 
-
 # 예외 핸들러들
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
@@ -47,7 +54,6 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         },
     )
 
-
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(
@@ -58,7 +64,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "detail": exc.errors(),
         },
     )
-
 
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
@@ -72,7 +77,6 @@ async def generic_exception_handler(request: Request, exc: Exception):
         },
     )
 
-
 # 라우터 등록
 app.include_router(resume_create, tags=["Resume-create"])
 app.include_router(resume_agent_init_router, tags=["Resume-agent-init"])
@@ -81,7 +85,6 @@ app.include_router(resume_extract, tags=["Resume-extract"])
 app.include_router(health)
 app.include_router(feedback, tags=["Feedback"])
 app.include_router(update_summary, tags=["Summary"])
-
 
 # 기본 헬스 체크
 @app.get("/health-check")
