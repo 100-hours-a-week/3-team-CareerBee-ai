@@ -2,12 +2,17 @@
 from fastapi import APIRouter, HTTPException
 from app.schemas.resume_extract import ResumeExtractRequest, ResumeExtractResponse
 from app.services.resume_extract_service import extract_resume_info
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.post("/resume/extract", response_model=ResumeExtractResponse)
 async def extract_resume(request: ResumeExtractRequest):
     try:
+        # 🔍 로그로 요청 받은 file_url 출력
+        logger.info(f"📥 [resume/extract] file_url received: {request.file_url}")
+
         result = await extract_resume_info(request.file_url)
         return ResumeExtractResponse(message="extraction_success", data=result)
     except ValueError as ve:
