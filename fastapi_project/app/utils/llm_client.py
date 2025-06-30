@@ -2,7 +2,7 @@ import os
 import asyncio
 import aiohttp
 import logging
-from typing import Optional, Union
+from typing import Optional
 from langchain_openai import ChatOpenAI
 
 
