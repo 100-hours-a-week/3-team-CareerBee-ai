@@ -58,7 +58,7 @@ def call_vllm(prompt: str) -> str:
     url = "http://localhost:8001/v1/chat/completions"
     headers = {"Content-Type": "application/json"}
     payload = {
-        "model": "CohereLabs/aya-expanse-8b",
+        "model": "/mnt/ssd/aya-expanse-8b",
         "messages": [
             {
                 "role": "system",
@@ -149,6 +149,8 @@ def generate_latest_issue(corp_name: str, return_docs: bool = False):
         )
         result = call_vllm(final_prompt)
     else:
+        prompt = fewshot_prompt.format(corp_name=corp_name, context=context)
+        result = call_vllm(prompt)
         prompt = fewshot_prompt.format(corp_name=corp_name, context=context)
         result = call_vllm(prompt)
 
