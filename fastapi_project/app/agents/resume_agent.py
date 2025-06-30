@@ -1,11 +1,13 @@
-# app/agents/resume_agent.py
+# resume_agent = build_resume_agent()
+
 from langgraph.graph import StateGraph, END
+from app.utils.llm_client import create_llm_client
 
 # from langgraph.tracers.langchain import LangChainTracer
-from app.agents.nodes.generate_question import generate_question_node
-from app.agents.nodes.check_completion import check_completion_node
-from app.agents.nodes.create_resume import create_resume_node
-from app.agents.nodes.receive_answer import receive_answer_node
+from app.agents.nodes.generate_question import GenerateQuestionNode
+from app.agents.nodes.check_completion import CheckCompletionNode
+from app.agents.nodes.create_resume import CreateResumeNode
+from app.agents.nodes.receive_answer import ReceiveAnswerNode
 from app.agents.schema.resume_create_agent import ResumeAgentState
 from dotenv import load_dotenv
 
@@ -17,12 +19,16 @@ load_dotenv()
 
 # DAG 노드 정의 및 연결
 def build_resume_agent():
+    # 통합 LLM 클라이언트 생성 (환경 변수에 따라 자동으로 OpenAI 또는 VLLM 선택)
+    llm_client = create_llm_client(temperature=0.3)
+
     builder = StateGraph(ResumeAgentState)  # name="resume-agent", tracer=tracer
 
-    builder.add_node("generate_question", generate_question_node)
-    builder.add_node("receive_answer", receive_answer_node)
-    builder.add_node("check_completion", check_completion_node)
-    builder.add_node("create_resume", create_resume_node)
+    # LLM이 필요한 노드들에는 llm_client 전달, 필요 없는 노드들은 기본값 사용
+    builder.add_node("generate_question", GenerateQuestionNode(llm_client))
+    builder.add_node("receive_answer", ReceiveAnswerNode())
+    builder.add_node("check_completion", CheckCompletionNode())
+    builder.add_node("create_resume", CreateResumeNode(llm_client))
 
     # ✅ 진입점: 사용자 응답 수신 이후 실행됨
     builder.set_entry_point("receive_answer")
