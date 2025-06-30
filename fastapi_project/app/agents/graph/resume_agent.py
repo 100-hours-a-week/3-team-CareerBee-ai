@@ -2,10 +2,10 @@
 from langgraph.graph import StateGraph, END
 
 # from langgraph.tracers.langchain import LangChainTracer
-from app.agents.nodes.generate_question import generate_question_node
-from app.agents.nodes.check_completion import check_completion_node
-from app.agents.nodes.create_resume import create_resume_node
-from app.agents.nodes.receive_answer import receive_answer_node
+from app.agents.nodes.generate_question import GenerateQuestionNode
+from app.agents.nodes.check_completion import CheckCompletionNode
+from app.agents.nodes.create_resume import CreateResumeNode
+from app.agents.nodes.receive_answer import ReceiveAnswerNode
 from app.agents.schema.resume_create_agent import ResumeAgentState
 from dotenv import load_dotenv
 
@@ -19,10 +19,10 @@ load_dotenv()
 def build_resume_agent():
     builder = StateGraph(ResumeAgentState)  # name="resume-agent", tracer=tracer
 
-    builder.add_node("generate_question", generate_question_node)
-    builder.add_node("receive_answer", receive_answer_node)
-    builder.add_node("check_completion", check_completion_node)
-    builder.add_node("create_resume", create_resume_node)
+    builder.add_node("generate_question", GenerateQuestionNode)
+    builder.add_node("receive_answer", ReceiveAnswerNode)
+    builder.add_node("check_completion", CheckCompletionNode)
+    builder.add_node("create_resume", CheckCompletionNode)
 
     # ✅ 진입점: 사용자 응답 수신 이후 실행됨
     builder.set_entry_point("receive_answer")

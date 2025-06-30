@@ -10,104 +10,114 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from bs4 import BeautifulSoup
 from markdown2 import markdown
+from app.agents.base_node import BaseNode
+
 
 llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.2)
 
 
-# 구분선
-def add_horizontal_line(paragraph):
-    pPr = paragraph._p.get_or_add_pPr()
-    border = OxmlElement("w:pBdr")
-    bottom = OxmlElement("w:bottom")
-    bottom.set(qn("w:val"), "single")
-    bottom.set(qn("w:sz"), "8")
-    bottom.set(qn("w:space"), "0")
-    bottom.set(qn("w:color"), "2F5496")
-    border.append(bottom)
-    pPr.append(border)
+class CreateResumeNode(BaseNode):
+    def __init__(self, llm: ChatOpenAI):
+        self.llm = llm
 
+    async def execute(self, state: ResumeAgentState) -> ResumeAgentState:
+        prompt = self._build_resume_prompt(state)
 
-# 밑줄 라벨
-def add_underlined_paragraph(doc, label, length=40):
-    p = doc.add_paragraph()
-    p.add_run(f"{label}: ")
-    run = p.add_run(" " * length)
-    run.font.underline = True
-    run.font.size = Pt(11)
+        # LLM으로 이력서 생성
+        content = await self._generate_resume_content(prompt)
 
+        # Word 문서 생성
+        docx_path = await self._create_word_document(state, content)
 
-# 마크다운 파싱 결과를 고급 스타일로 변환
-def render_llm_content_stylized(markdown_text: str, doc: Document):
-    html = markdown(markdown_text)
-    soup = BeautifulSoup(html, "html.parser")
-    current_section = None
-    for element in soup.descendants:
-        if element.name == "h1":
-            current_section = doc.add_heading(element.get_text(), level=1)
-            add_horizontal_line(current_section)
-        elif element.name == "h2":
-            current_section = doc.add_heading(element.get_text(), level=2)
-        elif element.name == "p":
-            doc.add_paragraph(element.get_text())
-        elif element.name == "li":
-            doc.add_paragraph("▪ " + element.get_text())
+        # 상태 업데이트
+        state.docx_path = docx_path
+        state.resume = content
+        state.step = "completed"
 
+        return state
 
-async def create_resume_node(state: ResumeAgentState) -> ResumeAgentState:
+    def _build_resume_prompt(self, state: ResumeAgentState) -> str:
+        # LLM에 보낼 요약 정보
+        base_info = f"""
+    이메일: {state.inputs.email}
+    희망 직무: {state.inputs.preferred_job}
+    전공 여부: {state.inputs.major_type}
+    재직 회사: {state.inputs.company_name}
+    직무명: {state.inputs.position}
+    재직 기간: {state.inputs.work_period}개월
+    자격증 수: {state.inputs.certification_count}
+    프로젝트 수: {state.inputs.project_count}
+    추가 경험: {state.inputs.additional_experiences}
+        """
 
-    inputs = state.inputs
-    answers = state.answers
+        qna_info = "\n".join([f"Q: {a['question']}\nA: {a['answer']}" for a in answers])
 
-    # 👉 LLM에 보낼 요약 정보
-    base_info = f"""
-이메일: {inputs.email}
-희망 직무: {inputs.preferred_job}
-전공 여부: {inputs.major_type}
-재직 회사: {inputs.company_name}
-직무명: {inputs.position}
-재직 기간: {inputs.work_period}개월
-자격증 수: {inputs.certification_count}
-프로젝트 수: {inputs.project_count}
-추가 경험: {inputs.additional_experiences}
+        return f"""
+    다음은 이력서에 포함될 정보입니다. 아래 정보를 기반으로 고급 이력서 초안을 마크다운 형식으로 작성해주세요. 항목: 경력 사항, 프로젝트, 기술 역량, 자격증 등
+
+    [입력 정보]
+    {base_info}
+
+    [질문 응답]
+    {qna_info}
     """
 
-    qna_info = "\n".join([f"Q: {a['question']}\nA: {a['answer']}" for a in answers])
+    async def _generate_resume_content(self, prompt: str) -> str:
+        """LLM으로 이력서 내용 생성"""
+        content = await asyncio.to_thread(self.llm.invoke, prompt)
+        return content.content.strip()
 
-    prompt = f"""
-다음은 이력서에 포함될 정보입니다. 아래 정보를 기반으로 고급 이력서 초안을 마크다운 형식으로 작성해주세요. 항목: 경력 사항, 프로젝트, 기술 역량, 자격증 등
+    async def _create_word_document(self, state: ResumeAgentState, content: str) -> str:
+        """Word 문서 생성"""
 
-[입력 정보]
-{base_info}
+        def write_to_doc():
+            doc = Document()
+            doc.add_heading("이력서", level=0).alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
 
-[질문 응답]
-{qna_info}
-"""
+            # 기본 정보 섹션
+            self._add_basic_info_section(doc, state.inputs)
 
-    # ▶ LLM 응답
-    content = await asyncio.to_thread(llm.invoke, prompt)
-    content = content.content.strip()
+            # LLM 생성 내용 섹션
+            self._render_llm_content_stylized(content, doc)
 
-    def write_to_doc():
-        doc = Document()
-        doc.add_heading("이력서", level=0).alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
+            os.makedirs("generated", exist_ok=True)
+            doc.save(path)
 
-        # ✍ 기본 정보는 기존 스타일로 작성
+        path = f"generated/resume_final_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
+        await asyncio.to_thread(write_to_doc)
+        return path
+
+    def _add_basic_info_section(self, doc: Document, inputs):
+        """기본 정보 섹션 추가"""
         doc.add_heading("기본 정보", level=1)
         doc.add_paragraph(f"이메일: {inputs.email}")
         doc.add_paragraph(f"희망 직무: {inputs.preferred_job}")
         doc.add_paragraph(f"전공 여부: {inputs.major_type}")
 
-        # ✨ LLM 응답 기반 섹션
-        render_llm_content_stylized(content, doc)
+    def _render_llm_content_stylized(self, markdown_text: str, doc: Document):
+        """마크다운 텍스트를 Word 문서에 스타일 적용하여 렌더링"""
+        html = markdown(markdown_text)
+        soup = BeautifulSoup(html, "html.parser")
 
-        os.makedirs("generated", exist_ok=True)
-        doc.save(path)
+        for element in soup.descendants:
+            if element.name == "h1":
+                section = doc.add_heading(element.get_text(), level=1)
+                self._add_horizontal_line(section)
+            elif element.name == "h2":
+                doc.add_heading(element.get_text(), level=2)
+            elif element.name == "p":
+                doc.add_paragraph(element.get_text())
+            elif element.name == "li":
+                doc.add_paragraph("▪ " + element.get_text())
 
-    # 저장
-    path = f"generated/resume_final_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
-    await asyncio.to_thread(write_to_doc)
-
-    state.docx_path = path
-    state.resume = content
-    state.step = "completed"
-    return state
+    def _add_horizontal_line(self, paragraph):
+        """단락에 수평선 추가"""
+        pPr = paragraph._p.get_or_add_pPr()
+        border = OxmlElement("w:pBdr")
+        bottom = OxmlElement("w:bottom")
+        bottom.set(qn("w:val"), "single")
+        bottom.set(qn("w:sz"), "8")
+        bottom.set(qn("w:space"), "0")
+        bottom.set(qn("w:color"), "2F5496")
+        border.append(bottom)
+        pPr.append(border)
