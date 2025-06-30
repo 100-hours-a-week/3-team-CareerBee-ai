@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
-from app.agents.graph.resume_agent import resume_agent
+from app.agents.resume_agent import resume_agent
 from app.schemas.resume_agent import ResumeAgentRequest, InputsModel
 from app.agents.schema.resume_create_agent import ResumeAgentState
 
@@ -59,11 +59,13 @@ async def update_resume_agent(payload: ResumeAgentRequest):
             raise HTTPException(status_code=400, detail=f"상태 변환 오류: {str(e)}")
 
         # stream 실행을 별도 스레드에서
-        def run_stream_from_state(state: ResumeAgentState):
+        async def run_async_stream_from_state(state: ResumeAgentState):
             try:
                 final_step = None
                 step_count = 0
-                for step in resume_agent.stream(state):
+
+                # atream 사용 (비동기)
+                async for step in resume_agent.astream(state):
                     step_count += 1
                     logging.info(f"Update stream step #{step_count}: {step}")
                     final_step = step
@@ -79,7 +81,7 @@ async def update_resume_agent(payload: ResumeAgentRequest):
                 raise e
 
         # 비동기로 스트림 실행
-        final_step = await asyncio.to_thread(run_stream_from_state, converted_state)
+        final_step = await run_async_stream_from_state(converted_state)
 
         if final_step is None:
             raise HTTPException(
