@@ -13,6 +13,7 @@ from app.schemas.resume_agent import (
 )
 from app.agents.nodes.generate_question import GenerateQuestionNode
 from app.agents.schema.resume_create_agent import ResumeAgentState
+from app.utils.llm_client import LLMClient, create_llm_client
 
 # 로깅 기본 설정
 logging.basicConfig(
@@ -20,8 +21,7 @@ logging.basicConfig(
 )
 
 # LLM 초기화
-llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.3)
-
+llm_client = create_llm_client(temperature=0.3)
 router = APIRouter()
 
 
@@ -59,7 +59,7 @@ async def initialize_resume_stream(payload: ResumeAgentInitRequest):
         )
 
         # GenerateQuestionNode 인스턴스 생성 및 실행
-        question_node = GenerateQuestionNode(llm)
+        question_node = GenerateQuestionNode(llm_client)
         updated_state = await question_node.execute(initial_state)
 
         # JSON 직렬화 후 응답 반환
