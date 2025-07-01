@@ -1,6 +1,7 @@
-from langchain_openai import ChatOpenAI
 from app.agents.schema.resume_create_agent import ResumeAgentState
 from app.agents.base_node import LLMBaseNode
+from app.utils.llm_client import LLMClient, create_llm_client
+from typing import Optional, Union
 
 
 class GenerateQuestionNode(LLMBaseNode):
