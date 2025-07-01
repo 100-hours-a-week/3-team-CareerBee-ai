@@ -15,7 +15,7 @@ class LLMClient:
 
         # 환경 변수 설정
         self.llm_type = os.getenv("LLM_TYPE", "openai")  # openai, vllm
-        self.vllm_url = os.getenv("VLLM_URL", "http://localhost:8000")
+        self.vllm_url = os.getenv("VLLM_URL", "http://localhost:8001")
         self.model_name = os.getenv("MODEL_NAME", "CohereLabs/aya-expanse-8b")
 
         self.logger.info(f"LLM 타입: {self.llm_type}")

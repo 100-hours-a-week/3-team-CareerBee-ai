@@ -1,7 +1,8 @@
 import os
 from datetime import datetime
 import asyncio
-from langchain_openai import ChatOpenAI
+from typing import Optional, Union
+from app.utils.llm_client import LLMClient, create_llm_client
 from app.agents.schema.resume_create_agent import ResumeAgentState
 from docx import Document
 from docx.shared import Pt
@@ -14,8 +15,19 @@ from app.agents.base_node import LLMBaseNode
 
 
 class CreateResumeNode(LLMBaseNode):
-    def __init__(self, llm: ChatOpenAI):
-        super().__init__(llm)
+    def __init__(self, llm_client: Optional[Union[LLMClient, object]] = None):
+        """
+        CreateResumeNode 초기화
+
+        Args:
+            llm_client: LLM 클라이언트 (None이면 자동 생성)
+        """
+        # LLM 클라이언트가 없으면 자동 생성
+        if llm_client is None:
+            llm_client = create_llm_client(temperature=0.3)
+
+        super().__init__(llm_client)
+
         # 환경 설정
         self.environment = os.getenv(
             "ENVIRONMENT", "development"
@@ -28,8 +40,19 @@ class CreateResumeNode(LLMBaseNode):
         try:
             prompt = self._build_resume_prompt(state)
 
-            # LLM으로 이력서 생성
-            content = await self._generate_resume_content(prompt)
+            # 시스템 프롬프트 정의
+            system_prompt = """당신은 전문 이력서 작성 컨설턴트입니다. 
+주어진 정보를 바탕으로 고품질의 마크다운 형식 이력서를 작성해주세요.
+다음 구조를 따라주세요:
+- 명확한 헤딩 구조 (# ## ### 사용)
+- 구체적이고 임팩트 있는 표현
+- 기술적 경험을 부각
+- 프로젝트 성과를 정량적으로 표현"""
+
+            # LLM으로 이력서 생성 (시스템 프롬프트 포함)
+            content = await self._safe_llm_call(
+                prompt, system_prompt, "이력서 생성 중 오류가 발생했습니다."
+            )
 
             # 생성된 내용을 임시 저장 (에러 처리용)
             self._last_generated_content = content

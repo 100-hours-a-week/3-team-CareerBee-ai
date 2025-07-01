@@ -1,5 +1,4 @@
 import logging
-import asyncio
 import traceback
 from fastapi import APIRouter, HTTPException
 from fastapi.encoders import jsonable_encoder
