@@ -4,13 +4,28 @@ from app.agents.base_node import LLMBaseNode
 
 
 class GenerateQuestionNode(LLMBaseNode):
-    def __init__(self, llm=None):
-        super().__init__(llm)
+    def __init__(self, llm_client: Optional[Union[LLMClient, object]] = None):
+        """
+        GenerateQuestionNode 초기화
+
+        Args:
+            llm_client: LLM 클라이언트 (None이면 자동 생성)
+        """
+        # LLM 클라이언트가 없으면 자동 생성
+        if llm_client is None:
+            llm_client = create_llm_client(
+                temperature=0.7
+            )  # 질문 생성에는 좀 더 창의적으로
+
+        super().__init__(llm_client)
         self.max_questions = 3
 
     async def execute(self, state: ResumeAgentState) -> ResumeAgentState:
         # 최대 질문 수 체크
         if state.asked_count >= self.max_questions:
+            self.logger.info(
+                f"최대 질문 수({self.max_questions})에 도달. 정보 수집 완료."
+            )
             return self._set_ready_state(state)
 
         context = self._build_context(state)
@@ -28,9 +43,16 @@ class GenerateQuestionNode(LLMBaseNode):
 4. 반드시 "- Q: [질문내용]" 형식으로 출력하세요
 5. 정보가 충분하다면 '없음'이라고 답하세요"""
 
-        response = await self._safe_llm_call(prompt, system_prompt, "없음")
+        try:
+            response = await self._safe_llm_call(prompt, system_prompt, "없음")
+            self.logger.debug(f"LLM 응답: {response}")
 
-        return self._process_response(state, response)
+            return self._process_response(state, response)
+
+        except Exception as e:
+            self.logger.error(f"질문 생성 중 오류: {e}")
+            # 에러 발생시 정보 수집 완료로 처리
+            return self._set_ready_state(state)
 
     def _set_ready_state(self, state: ResumeAgentState) -> ResumeAgentState:
         """정보 수집 완료 상태로 설정"""

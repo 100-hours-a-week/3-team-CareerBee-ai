@@ -13,7 +13,7 @@ from app.schemas.resume_create import ResumeCreateRequest
 from app.agents.schema.resume_create_agent import ResumeAgentState
 from app.agents.nodes.create_resume import CreateResumeNode
 from app.utils.upload_file_to_s3 import upload_file_to_s3
-from langchain_openai import ChatOpenAI
+from app.utils.llm_client import create_llm_client
 
 # 로깅 설정
 logging.basicConfig(
@@ -22,7 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # LLM 초기화
-llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.3)
+llm = create_llm_client(temperature=0.3)
 
 
 # ------------------------- 스타일 관련 도우미 함수들 -------------------------
