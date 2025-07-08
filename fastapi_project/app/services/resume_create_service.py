@@ -1,3 +1,4 @@
+# app/services/resume_create_service.py
 import os
 import logging
 import traceback
@@ -9,8 +10,8 @@ from docx.oxml.ns import qn
 from io import BytesIO
 from datetime import datetime
 import asyncio
-from app.schemas.resume_create import ResumeCreateRequest
-from app.agents.schema.resume_create_agent import ResumeAgentState
+from app.schemas import ResumeCreateRequest
+from app.schemas import ResumeAgentState
 from app.agents.nodes.create_resume import CreateResumeNode
 from app.utils.upload_file_to_s3 import upload_file_to_s3
 from app.utils.llm_client import create_llm_client

@@ -1,4 +1,4 @@
-from app.agents.schema.resume_create_agent import ResumeAgentState
+from app.schemas import ResumeAgentState, ResumeAgentUpdateRequest
 from app.agents.base_node import LLMBaseNode
 from app.utils.llm_client import LLMClient, create_llm_client
 from typing import Optional, Union
@@ -41,7 +41,7 @@ class GenerateQuestionNode(LLMBaseNode):
 1. 구체적이고 답변 가능한 질문을 만드세요
 2. 이전 질문과 중복되지 않도록 하세요  
 3. 이력서 품질 향상에 도움이 되는 정보를 얻을 수 있는 질문을 하세요
-4. 반드시 "- Q: [질문내용]" 형식으로 출력하세요
+4. 반드시 "[질문내용]" 형식으로 출력하세요
 5. 정보가 충분하다면 '없음'이라고 답하세요"""
 
         try:
@@ -89,9 +89,8 @@ class GenerateQuestionNode(LLMBaseNode):
         아래는 사용자가 개발자 이력서를 작성하기 위해 입력한 정보입니다. 
         이를 바탕으로 완성도가 높은 이력서를 작성하기 위해 추가로 필요한 정보를 얻기 위한 질문을 "한 개만" 생성하세요. 
         단, 이전에 했던 질문과 겹치지 않도록 하세요.
-        생성하는 질문은 반드시 다음과 같은 형식으로 출력하세요:
 
-        - Q: [여기에 질문 내용 작성]
+        [여기에 질문 내용 작성]
         
         이력서를 작성하기에 정보가 충분하다고 판단되면 '없음'이라고 출력해도 됩니다. 
         

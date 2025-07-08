@@ -53,6 +53,7 @@ SQLAlchemy==2.0.40
 cryptography==44.0.3
 pandas==2.2.2
 numpy==1.26.4
+redis==6.2.0
 
 # --- OpenAI ---
 openai==1.77.0
