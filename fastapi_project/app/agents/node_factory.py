@@ -5,6 +5,7 @@ from app.agents.nodes.generate_question import GenerateQuestionNode
 from app.agents.nodes.receive_answer import ReceiveAnswerNode
 from app.agents.nodes.check_completion import CheckCompletionNode
 from app.agents.nodes.create_resume import CreateResumeNode
+from app.schemas import ResumeAgentState
 
 
 class NodeFactory:

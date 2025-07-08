@@ -2,6 +2,7 @@ import pandas as pd
 from app.utils.summarizer import generate_issue_summaries
 from app.utils.batch import update_issues_in_batches
 
+
 def run_summary_pipeline():
     print("\n📈 기업 요약 파이프라인 시작")
     df = pd.read_csv("app/data/catch_company_details.csv")

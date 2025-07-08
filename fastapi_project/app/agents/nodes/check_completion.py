@@ -1,5 +1,5 @@
 from app.agents.base_node import BaseNode
-from app.agents.schema.resume_create_agent import ResumeAgentState
+from app.schemas import ResumeAgentState, ResumeAgentUpdateRequest
 
 
 class CheckCompletionNode(BaseNode):

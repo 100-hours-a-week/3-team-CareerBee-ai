@@ -1,7 +1,7 @@
+# app/agents/base_node.py
 from abc import ABC, abstractmethod
 import logging
-from typing import Dict, Any, Optional
-from app.agents.schema.resume_create_agent import ResumeAgentState
+from app.schemas import ResumeAgentState
 
 
 class BaseNode(ABC):

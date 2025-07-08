@@ -3,7 +3,7 @@ from datetime import datetime
 import asyncio
 from typing import Optional, Union
 from app.utils.llm_client import LLMClient, create_llm_client
-from app.agents.schema.resume_create_agent import ResumeAgentState
+from app.schemas import ResumeAgentState, ResumeAgentUpdateRequest
 from docx import Document
 from docx.shared import Pt
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
@@ -296,7 +296,7 @@ class CreateResumeNode(LLMBaseNode):
         for i, qa in enumerate(answers, 1):
             fallback_content += f"\n### Q{i}: {qa['question']}\n{qa['answer']}\n"
 
-        fallback_content += f"\n\n---\n⚠️ 파일 생성 중 오류가 발생하여 텍스트 형태로 제공됩니다.\n텍스트를 복사하여 별도 문서로 저장해주세요."
+        fallback_content += f"\n\n---\n 파일 생성 중 오류가 발생하여 텍스트 형태로 제공됩니다.\n텍스트를 복사하여 별도 문서로 저장해주세요."
 
         return fallback_content
 
