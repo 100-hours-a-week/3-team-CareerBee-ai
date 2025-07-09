@@ -2,11 +2,10 @@
 """
 이력서 에이전트 init → update 플로우 전체 테스트
 """
-import asyncio
-import json
+
 import requests
 import time
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 # FastAPI 서버 URL (로컬 개발 서버)
 BASE_URL = "http://localhost:8000"
@@ -33,7 +32,7 @@ class FlowTester:
             print(f"❌ 서버 연결 실패: {e}")
             return False
 
-    def test_init_endpoint(self, memberId: int) -> Dict[str, Any]:
+    def test_init_endpoint(self, memberId: int) -> Optional[Dict[str, Any]]:
         """초기화 엔드포인트 테스트"""
         print(f"\n🚀 1단계: 초기화 테스트 (memberId={memberId})")
 
@@ -75,7 +74,9 @@ class FlowTester:
             print(f"❌ 초기화 요청 실패: {e}")
             return None
 
-    def test_update_endpoint(self, memberId: int, answer: str) -> Dict[str, Any]:
+    def test_update_endpoint(
+        self, memberId: int, answer: str
+    ) -> Optional[Dict[str, Any]]:
         """업데이트 엔드포인트 테스트"""
         print(f"\n🔄 2단계: 업데이트 테스트 (memberId={memberId})")
 
@@ -110,7 +111,7 @@ class FlowTester:
             print(f"❌ 업데이트 요청 실패: {e}")
             return None
 
-    def test_status_endpoint(self, memberId: int) -> Dict[str, Any]:
+    def test_status_endpoint(self, memberId: int) -> Optional[Dict[str, Any]]:
         """상태 조회 엔드포인트 테스트"""
         print(f"\n📊 상태 확인 (memberId={memberId})")
 
