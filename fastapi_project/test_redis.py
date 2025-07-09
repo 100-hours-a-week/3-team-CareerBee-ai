@@ -1,5 +1,5 @@
-# test_redis_connection.py
-# 이 파일을 fastapi_project/ 루트에 저장하세요
+# fastapi_project/test_redis_connection.py
+
 """
 Redis 연결 및 기본 기능 테스트 스크립트
 """

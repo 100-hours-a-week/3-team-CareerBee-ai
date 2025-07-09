@@ -1,4 +1,4 @@
-# test_init_update_flow.py
+# fastapi_project/test_init_update_flow.py
 """
 이력서 에이전트 init → update 플로우 전체 테스트
 """
