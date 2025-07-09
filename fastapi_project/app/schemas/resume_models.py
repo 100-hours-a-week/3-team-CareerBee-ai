@@ -155,6 +155,24 @@ class ResumeAgentInitRequest(BaseModel):
     memberId: int = Field(..., description="회원 ID")
     inputs: BaseInputsModel = Field(..., description="기본 입력 데이터")
 
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "memberId": 3,
+                "inputs": {
+                    "email": "test@example.com",
+                    "preferred_job": "AI 엔지니어",
+                    "certification_count": 2,
+                    "project_count": 3,
+                    "major_type": "MAJOR",
+                    "company_name": "카카오",
+                    "position": "백엔드 개발자",
+                    "work_period": 24,
+                    "additional_experiences": "Python, FastAPI 경험",
+                },
+            }
+        }
+
 
 class ResumeAgentUpdateRequest(BaseModel):
     """이력서 에이전트 업데이트 요청 (Spring → FastAPI)"""
@@ -167,6 +185,14 @@ class ResumeAgentUpdateRequest(BaseModel):
         """API 명세에 따른 답변 추출"""
         return self.inputs.answer
 
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "memberId": 3,
+                "inputs": {"answer": "커리어비가 가장 열심히한 프로젝트입니다."},
+            }
+        }
+
 
 class UpdateInputs(BaseModel):
     """업데이트 요청의 inputs 부분"""
@@ -174,9 +200,98 @@ class UpdateInputs(BaseModel):
     answer: str = Field(..., description="사용자 답변")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {"answer": "커리어비가 가장 열심히한 프로젝트입니다."}
         }
+
+
+# ================================
+# 3. API 응답 모델들 (누락된 모델들 추가)
+# ================================
+
+
+class ResumeAgentInitResponse(BaseModel):
+    """이력서 에이전트 초기화 응답 (FastAPI → Spring)"""
+
+    memberId: int = Field(..., description="회원 ID")
+    question: str = Field(..., description="첫 번째 질문")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "memberId": 3,
+                "question": "가장 자신있는 기술 스택이나 프로그래밍 언어는 무엇인가요?",
+            }
+        }
+
+
+class ResumeAgentUpdateResponse(BaseModel):
+    """이력서 에이전트 업데이트 응답 (FastAPI → Spring)"""
+
+    memberId: int = Field(..., description="회원 ID")
+    isComplete: bool = Field(..., description="완료 여부")
+    question: Optional[str] = Field(default=None, description="다음 질문 (미완료시)")
+    resumeObjectKey: Optional[str] = Field(
+        default=None, description="S3 객체 키 (완료시)"
+    )
+
+    class Config:
+        json_schema_extra = {
+            "examples": {
+                "continue": {
+                    "summary": "추가 질문이 있는 경우",
+                    "value": {
+                        "memberId": 3,
+                        "isComplete": False,
+                        "question": "두번째 질문입니다.",
+                        "resumeObjectKey": None,
+                    },
+                },
+                "complete": {
+                    "summary": "이력서 생성 완료",
+                    "value": {
+                        "memberId": 3,
+                        "isComplete": True,
+                        "question": None,
+                        "resumeObjectKey": "resume/member_3_20240107_143022.docx",
+                    },
+                },
+            }
+        }
+
+
+class AgentStatusResponse(BaseModel):
+    """에이전트 상태 조회 응답 (디버깅용)"""
+
+    memberId: int = Field(..., description="회원 ID")
+    step: str = Field(..., description="현재 단계")
+    asked_count: int = Field(..., description="질문한 횟수")
+    max_questions: int = Field(..., description="최대 질문 수")
+    info_ready: bool = Field(..., description="완료 여부")
+    pending_questions: int = Field(..., description="대기 질문 수")
+    answers_count: int = Field(..., description="답변 수")
+    created_at: str = Field(..., description="생성 시간")
+    updated_at: str = Field(..., description="수정 시간")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "memberId": 3,
+                "step": "questioning",
+                "asked_count": 1,
+                "max_questions": 3,
+                "info_ready": False,
+                "pending_questions": 1,
+                "answers_count": 1,
+                "created_at": "2024-01-07T14:30:22",
+                "updated_at": "2024-01-07T14:35:15",
+            }
+        }
+
+
+# ================================
+# 4. 기존 이력서 생성 요청 모델
+# ================================
 
 
 class ResumeCreateRequest(BaseModel):
@@ -206,9 +321,63 @@ class ResumeCreateRequest(BaseModel):
             additional_experiences=self.additional_experiences or "",
         )
 
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "email": "test@example.com",
+                "preferred_job": "백엔드 개발자",
+                "certification_count": 2,
+                "project_count": 3,
+                "major_type": "MAJOR",
+                "company_name": "스타트업",
+                "work_period": 12,
+                "position": "주니어 개발자",
+                "additional_experiences": "Python, FastAPI 경험",
+            }
+        }
+
+
+class ResumeCreateResponse(BaseModel):
+    """기본 이력서 생성 응답"""
+
+    httpStatusCode: int = Field(default=200, description="HTTP 상태 코드")
+    message: str = Field(..., description="응답 메시지")
+    data: "ResumeCreateData" = Field(..., description="응답 데이터")
+
+
+class ResumeCreateData(BaseModel):
+    """기본 이력서 생성 응답 데이터"""
+
+    resumeUrl: str = Field(..., description="이력서 다운로드 URL")
+    filename: str = Field(..., description="파일명")
+    createdAt: datetime = Field(..., description="생성 시간")
+
+    class Config:
+        json_encoders = {datetime: lambda v: v.isoformat()}
+
 
 # ================================
-# 3. 레거시 호환성 모델 (점진적 마이그레이션용)
+# 5. 공통 에러 응답 모델
+# ================================
+
+
+class ErrorResponse(BaseModel):
+    """공통 에러 응답"""
+
+    error: bool = Field(default=True, description="에러 여부")
+    message: str = Field(..., description="에러 메시지")
+    status_code: int = Field(..., description="HTTP 상태 코드")
+    details: Optional[Dict] = Field(default=None, description="상세 정보")
+    timestamp: datetime = Field(
+        default_factory=datetime.now, description="에러 발생 시간"
+    )
+
+    class Config:
+        json_encoders = {datetime: lambda v: v.isoformat()}
+
+
+# ================================
+# 6. 레거시 호환성 모델
 # ================================
 
 # 기존 코드와의 호환성을 위해 유지 (나중에 제거 예정)
@@ -216,7 +385,7 @@ InputsModel = BaseInputsModel  # 별칭
 
 
 # ================================
-# 4. 유틸리티 함수들
+# 7. 유틸리티 함수들
 # ================================
 
 
@@ -245,3 +414,76 @@ def update_state_with_answer(
     """상태에 답변 추가 헬퍼 함수"""
     state.add_answer(question, answer)
     return state
+
+
+# ================================
+# 8. 응답 생성 헬퍼 함수들
+# ================================
+
+
+def create_agent_init_response(memberId: int, question: str) -> dict:
+    """에이전트 초기화 응답 생성"""
+    return {"memberId": memberId, "question": question}
+
+
+def create_agent_update_response(
+    memberId: int,
+    is_complete: bool,
+    question: Optional[str] = None,
+    resume_object_key: Optional[str] = None,
+) -> dict:
+    """에이전트 업데이트 응답 생성"""
+    return {
+        "memberId": memberId,
+        "isComplete": is_complete,
+        "question": question,
+        "resumeObjectKey": resume_object_key,
+    }
+
+
+def create_error_response(
+    message: str, status_code: int, details: Optional[Dict] = None
+) -> ErrorResponse:
+    """에러 응답 생성"""
+    return ErrorResponse(message=message, status_code=status_code, details=details)
+
+
+def create_resume_create_response(
+    resume_url: str, filename: str, message: str = "이력서 초안 생성에 성공하였습니다."
+) -> ResumeCreateResponse:
+    """이력서 생성 응답 생성"""
+    return ResumeCreateResponse(
+        message=message,
+        data=ResumeCreateData(
+            resumeUrl=resume_url, filename=filename, createdAt=datetime.now()
+        ),
+    )
+
+
+def create_agent_status_response(
+    memberId: int,
+    step: str,
+    asked_count: int,
+    max_questions: int,
+    info_ready: bool,
+    pending_questions_count: int,
+    answers_count: int,
+    created_at: str,
+    updated_at: str,
+) -> AgentStatusResponse:
+    """에이전트 상태 조회 응답 생성"""
+    return AgentStatusResponse(
+        memberId=memberId,
+        step=step,
+        asked_count=asked_count,
+        max_questions=max_questions,
+        info_ready=info_ready,
+        pending_questions=pending_questions_count,
+        answers_count=answers_count,
+        created_at=created_at,
+        updated_at=updated_at,
+    )
+
+
+# Forward reference 해결
+ResumeCreateResponse.model_rebuild()
