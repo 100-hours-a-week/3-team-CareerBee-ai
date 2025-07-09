@@ -11,6 +11,7 @@ class CheckCompletionNode(BaseNode):
 
         if self._is_completed(state):
             state.info_ready = True
+            state.pending_questions = []
         return state
 
     def _is_completed(self, state: ResumeAgentState) -> bool:

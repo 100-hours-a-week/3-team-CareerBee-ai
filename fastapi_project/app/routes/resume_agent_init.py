@@ -43,34 +43,34 @@ async def initialize_resume_agent(payload: ResumeAgentInitRequest):
     1. 초기 상태 생성 (Redis 기반)
     2. 첫 번째 질문 생성 (LLM 또는 fallback)
     3. Redis에 상태 저장
-    4. 새로운 형식 응답 반환 (member_id + question)
+    4. 새로운 형식 응답 반환 (memberId + question)
     """
-    member_id = payload.member_id
+    memberId = payload.memberId
 
     try:
-        logger.info(f"이력서 에이전트 초기화 요청: member_id={member_id}")
+        logger.info(f"이력서 에이전트 초기화 요청: memberId={memberId}")
 
         # 1. 기존 상태 확인 및 정리
-        existing_state = await redis_client.load_state(member_id)
+        existing_state = await redis_client.load_state(memberId)
         if existing_state:
-            logger.warning(f"기존 진행 중인 세션 발견: member_id={member_id}")
+            logger.warning(f"기존 진행 중인 세션 발견: memberId={memberId}")
 
             # 기존 질문이 있고 완료되지 않았다면 기존 질문 반환
             if existing_state.pending_questions and not existing_state.is_complete():
                 response_data = {
-                    "member_id": member_id,
+                    "memberId": memberId,
                     "question": existing_state.pending_questions[0],
                 }
-                logger.info(f"기존 세션 질문 반환: member_id={member_id}")
+                logger.info(f"기존 세션 질문 반환: memberId={memberId}")
                 return JSONResponse(content=response_data)
 
             # 완료되었거나 문제가 있다면 새로 시작
-            await redis_client.delete_state(member_id)
-            logger.info(f"기존 세션 정리 완료: member_id={member_id}")
+            await redis_client.delete_state(memberId)
+            logger.info(f"기존 세션 정리 완료: memberId={memberId}")
 
         # 2. 새로운 초기 상태 생성
-        initial_state = create_initial_state(member_id=member_id, inputs=payload.inputs)
-        logger.info(f"초기 상태 생성 완료: member_id={member_id}")
+        initial_state = create_initial_state(memberId=memberId, inputs=payload.inputs)
+        logger.info(f"초기 상태 생성 완료: memberId={memberId}")
 
         # 3. 첫 번째 질문 생성
         first_question = await _generate_first_question(initial_state)
@@ -80,9 +80,9 @@ async def initialize_resume_agent(payload: ResumeAgentInitRequest):
         initial_state.step = "questioning"
 
         # 5. Redis에 상태 저장
-        save_success = await redis_client.save_state(member_id, initial_state)
+        save_success = await redis_client.save_state(memberId, initial_state)
         if not save_success:
-            logger.error(f"상태 저장 실패: member_id={member_id}")
+            logger.error(f"상태 저장 실패: memberId={memberId}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="상태 저장에 실패했습니다.",
@@ -90,12 +90,10 @@ async def initialize_resume_agent(payload: ResumeAgentInitRequest):
 
         # 6. 새로운 형식 응답 반환
         response = create_agent_init_response(
-            member_id=member_id, question=first_question
+            memberId=memberId, question=first_question
         )
 
-        logger.info(
-            f"✅ 초기화 완료: member_id={member_id}, question='{first_question}'"
-        )
+        logger.info(f"✅ 초기화 완료: memberId={memberId}, question='{first_question}'")
         return JSONResponse(content=response.dict())
 
     except HTTPException:
@@ -103,7 +101,7 @@ async def initialize_resume_agent(payload: ResumeAgentInitRequest):
         raise
 
     except Exception as e:
-        logger.error(f"초기화 중 오류 발생: member_id={member_id}, error={str(e)}")
+        logger.error(f"초기화 중 오류 발생: memberId={memberId}, error={str(e)}")
         logger.error(traceback.format_exc())
 
         # 에러 응답 반환
@@ -136,23 +134,23 @@ async def _generate_first_question(state) -> str:
         return FALLBACK_QUESTIONS[0]
 
 
-@router.get("/resume/agent/status/{member_id}")
-async def get_agent_status(member_id: int):
+@router.get("/resume/agent/status/{memberId}")
+async def get_agent_status(memberId: int):
     """
     에이전트 상태 조회 API (디버깅용)
     """
     try:
-        state = await redis_client.load_state(member_id)
+        state = await redis_client.load_state(memberId)
 
         if not state:
             raise HTTPException(
                 status_code=404,
-                detail=f"회원 {member_id}의 이력서 생성 세션을 찾을 수 없습니다.",
+                detail=f"회원 {memberId}의 이력서 생성 세션을 찾을 수 없습니다.",
             )
 
         # 상태 정보 반환
         status_data = {
-            "member_id": member_id,
+            "memberId": memberId,
             "step": state.step,
             "asked_count": state.asked_count,
             "max_questions": state.max_questions,
@@ -168,20 +166,20 @@ async def get_agent_status(member_id: int):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"상태 조회 실패: member_id={member_id}, error={str(e)}")
+        logger.error(f"상태 조회 실패: memberId={memberId}, error={str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/resume/agent/session/{member_id}")
-async def delete_agent_session(member_id: int):
+@router.delete("/resume/agent/session/{memberId}")
+async def delete_agent_session(memberId: int):
     """
     에이전트 세션 삭제 API (관리용)
     """
     try:
-        deleted = await redis_client.delete_state(member_id)
+        deleted = await redis_client.delete_state(memberId)
 
         response_data = {
-            "member_id": member_id,
+            "memberId": memberId,
             "deleted": deleted,
             "message": (
                 "세션이 삭제되었습니다." if deleted else "삭제할 세션이 없습니다."
@@ -191,7 +189,7 @@ async def delete_agent_session(member_id: int):
         return JSONResponse(content=response_data)
 
     except Exception as e:
-        logger.error(f"세션 삭제 실패: member_id={member_id}, error={str(e)}")
+        logger.error(f"세션 삭제 실패: memberId={memberId}, error={str(e)}")
         raise HTTPException(status_code=500, detail=f"세션 삭제 실패: {str(e)}")
 
 

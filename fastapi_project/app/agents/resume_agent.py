@@ -7,12 +7,12 @@ from app.agents.nodes.generate_question import GenerateQuestionNode
 from app.agents.nodes.check_completion import CheckCompletionNode
 from app.agents.nodes.create_resume import CreateResumeNode
 from app.agents.nodes.receive_answer import ReceiveAnswerNode
-from app.schemas import BaseInputsModel, ResumeAgentState
-
+from app.schemas import ResumeAgentState
+import logging
 from dotenv import load_dotenv
 
 load_dotenv()
-
+logger = logging.getLogger(__name__)
 # 트레이서 인스턴스 생성
 # tracer = LangChainTracer()
 

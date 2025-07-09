@@ -20,7 +20,9 @@ class BaseInputsModel(BaseModel):
     company_name: str = Field(default="", description="회사명")
     position: str = Field(default="", description="직책")
     work_period: int = Field(default=0, ge=0, description="근무 기간 (개월)")
-    additional_experiences: str = Field(dafault="", description="추가 경험사항")
+    additional_experiences: str = Field(
+        default="", description="추가 경험사항"
+    )  # 오타 수정: dafault -> default
 
     @validator("email")
     def validate_email(cls, v):
@@ -61,7 +63,9 @@ class QuestionAnswerPair(BaseModel):
 
     question: str = Field(..., description="질문 내용")
     answer: str = Field(..., description="답변 내용")
-    question_type: str = Field(defaulr="general", description="질문 유형")
+    question_type: str = Field(
+        default="general", description="질문 유형"
+    )  # 오타 수정: defaulr -> default
     asked_at: datetime = Field(default_factory=datetime.now, description="질문 시간")
 
     class Config:
