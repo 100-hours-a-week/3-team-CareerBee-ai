@@ -39,21 +39,21 @@ class RedisClient:
         self.memory_store: Dict[str, Any] = {}
         self.memory_locks: Dict[str, datetime] = {}
 
-    def _get_state_key(self, member_id: int) -> str:
+    def _get_state_key(self, memberId: int) -> str:
         """상태 저장용 Redis 키 생성"""
-        return f"resume:{member_id}"
+        return f"resume:{memberId}"
 
-    def _get_lock_key(self, member_id: int) -> str:
+    def _get_lock_key(self, memberId: int) -> str:
         """락용 Redis 키 생성"""
-        return f"lock:resume:{member_id}"
+        return f"lock:resume:{memberId}"
 
     # =============================================================================
     # 상태 관리 메서드들 (ResumeAgentState 전용)
     # =============================================================================
 
-    async def save_state(self, member_id: int, state: "ResumeAgentState") -> bool:
+    async def save_state(self, memberId: int, state: "ResumeAgentState") -> bool:
         """상태 저장"""
-        state_key = self._get_state_key(member_id)
+        state_key = self._get_state_key(memberId)
 
         try:
             # ResumeAgentState를 Redis용 dict로 변환
@@ -81,16 +81,16 @@ class RedisClient:
         except Exception as e:
             logger.error(f"상태 저장 실패: {e}")
             # 디버깅을 위한 추가 정보
-            logger.error(f"저장하려던 상태: member_id={member_id}")
+            logger.error(f"저장하려던 상태: memberId={memberId}")
             logger.error(f"상태 타입: {type(state)}")
             import traceback
 
             logger.error(f"스택 트레이스: {traceback.format_exc()}")
             return False
 
-    async def load_state(self, member_id: int) -> Optional["ResumeAgentState"]:
+    async def load_state(self, memberId: int) -> Optional["ResumeAgentState"]:
         """상태 조회"""
-        state_key = self._get_state_key(member_id)
+        state_key = self._get_state_key(memberId)
 
         try:
             if self.redis_client:
@@ -126,9 +126,9 @@ class RedisClient:
             logger.error(f"상태 조회 실패: {e}")
             return None
 
-    async def delete_state(self, member_id: int) -> bool:
+    async def delete_state(self, memberId: int) -> bool:
         """상태 삭제"""
-        state_key = self._get_state_key(member_id)
+        state_key = self._get_state_key(memberId)
 
         try:
             deleted = False
@@ -236,10 +236,10 @@ class RedisClient:
     # 락 (동시성 제어) 메서드들
     # =============================================================================
 
-    async def acquire_lock(self, member_id: int, timeout: Optional[int] = None) -> bool:
+    async def acquire_lock(self, memberId: int, timeout: Optional[int] = None) -> bool:
         """락 획득"""
-        lock_key = self._get_lock_key(member_id)
-        lock_value = f"lock:{member_id}:{datetime.now().isoformat()}"
+        lock_key = self._get_lock_key(memberId)
+        lock_value = f"lock:{memberId}:{datetime.now().isoformat()}"
         timeout = timeout or self.lock_ttl
 
         try:
@@ -285,9 +285,9 @@ class RedisClient:
             logger.error(f"락 획득 실패: {e}")
             return False
 
-    async def release_lock(self, member_id: int) -> bool:
+    async def release_lock(self, memberId: int) -> bool:
         """락 해제"""
-        lock_key = self._get_lock_key(member_id)
+        lock_key = self._get_lock_key(memberId)
 
         try:
             released = False

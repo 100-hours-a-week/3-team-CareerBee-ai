@@ -1,3 +1,4 @@
+# app/agents/nodes/create_resume.py
 import os
 from datetime import datetime
 import asyncio
@@ -34,7 +35,39 @@ class CreateResumeNode(LLMBaseNode):
         )  # development, production
         self.use_s3 = os.getenv("USE_S3", "false").lower() == "true"
 
-        self.logger.info(f"환경: {self.environment}, S3 사용: {self.use_s3}")
+        # AWS S3 관련 환경변수 체크
+        self.s3_available = self._check_s3_availability()
+
+        self.logger.info(
+            f"환경: {self.environment}, S3 사용: {self.use_s3}, S3 가용: {self.s3_available}"
+        )
+
+    def _check_s3_availability(self) -> bool:
+        """S3 업로드 기능 사용 가능 여부 확인"""
+        try:
+            # S3 업로드 함수 import 테스트
+            from app.utils.upload_file_to_s3 import async_upload_file_to_s3
+
+            # 필수 환경변수 확인
+            required_vars = [
+                "AWS_ACCESS_KEY_ID",
+                "AWS_SECRET_ACCESS_KEY",
+                "AWS_DEFAULT_REGION",
+            ]
+            missing_vars = [var for var in required_vars if not os.getenv(var)]
+
+            if missing_vars:
+                self.logger.warning(f"S3 관련 환경변수 누락: {missing_vars}")
+                return False
+
+            return True
+
+        except ImportError as e:
+            self.logger.warning(f"S3 업로드 모듈 import 실패: {e}")
+            return False
+        except Exception as e:
+            self.logger.warning(f"S3 가용성 체크 실패: {e}")
+            return False
 
     async def execute(self, state: ResumeAgentState) -> ResumeAgentState:
         try:
@@ -54,21 +87,25 @@ class CreateResumeNode(LLMBaseNode):
                 prompt, system_prompt, "이력서 생성 중 오류가 발생했습니다."
             )
 
-            # 생성된 내용을 임시 저장 (에러 처리용)
-            self._last_generated_content = content
-
-            # 환경에 따른 파일 처리
-            if self.use_s3:
-                # 프로덕션: S3 업로드
-                docx_path = await self._create_and_upload_document(state, content)
+            # S3 업로드 시도 (가용한 경우에만)
+            if self.use_s3 and self.s3_available:
+                try:
+                    # 프로덕션: S3 업로드 시도
+                    docx_path = await self._create_and_upload_document(state, content)
+                    self.logger.info(f"S3 업로드 성공: {docx_path}")
+                except Exception as e:
+                    self.logger.error(f"S3 업로드 실패, 로컬 저장으로 fallback: {e}")
+                    # S3 실패시 로컬 저장으로 fallback
+                    docx_path = await self._create_local_document(state, content)
             else:
-                # 개발: 로컬 저장
+                # 개발 환경 또는 S3 불가용: 로컬 저장
                 docx_path = await self._create_local_document(state, content)
 
             # 상태 업데이트
             state.docx_path = docx_path
             state.resume = content
             state.step = "completed"
+            state.info_ready = True  # 완료 플래그 설정
 
             return state
 

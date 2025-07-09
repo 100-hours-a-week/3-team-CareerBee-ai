@@ -1,5 +1,5 @@
-# test_redis_connection.py
-# 이 파일을 fastapi_project/ 루트에 저장하세요
+# fastapi_project/test_redis_connection.py
+
 """
 Redis 연결 및 기본 기능 테스트 스크립트
 """
@@ -57,7 +57,7 @@ async def test_redis_connection():
     # 3. ResumeAgentState 저장/로드 테스트
     print("\n3. ResumeAgentState 저장/로드 테스트")
     try:
-        member_id = 999  # 테스트용 ID
+        memberId = 999  # 테스트용 ID
 
         # 테스트용 입력 데이터 생성
         test_inputs = BaseInputsModel(
@@ -75,14 +75,14 @@ async def test_redis_connection():
         # 초기 상태 생성
         from app.schemas import create_initial_state
 
-        initial_state = create_initial_state(member_id=member_id, inputs=test_inputs)
+        initial_state = create_initial_state(memberId=memberId, inputs=test_inputs)
         initial_state.pending_questions = ["첫 번째 테스트 질문입니다."]
         initial_state.step = "questioning"
 
-        print(f"📝 테스트 상태 생성: member_id={member_id}")
+        print(f"📝 테스트 상태 생성: memberId={memberId}")
 
         # 상태 저장
-        save_success = await redis_client.save_state(member_id, initial_state)
+        save_success = await redis_client.save_state(memberId, initial_state)
         if save_success:
             print("✅ 상태 저장 성공")
         else:
@@ -90,10 +90,10 @@ async def test_redis_connection():
             return False
 
         # 상태 로드
-        loaded_state = await redis_client.load_state(member_id)
+        loaded_state = await redis_client.load_state(memberId)
         if loaded_state:
             print("✅ 상태 로드 성공")
-            print(f"   - member_id: {loaded_state.member_id}")
+            print(f"   - memberId: {loaded_state.memberId}")
             print(f"   - step: {loaded_state.step}")
             print(f"   - pending_questions: {loaded_state.pending_questions}")
             print(f"   - inputs.email: {loaded_state.inputs.email}")
@@ -103,7 +103,7 @@ async def test_redis_connection():
 
         # 데이터 검증
         if (
-            loaded_state.member_id == member_id
+            loaded_state.memberId == memberId
             and loaded_state.step == "questioning"
             and loaded_state.inputs.email == "test@example.com"
         ):
@@ -113,7 +113,7 @@ async def test_redis_connection():
             return False
 
         # 상태 삭제
-        delete_success = await redis_client.delete_state(member_id)
+        delete_success = await redis_client.delete_state(memberId)
         if delete_success:
             print("✅ 상태 삭제 성공")
         else:
@@ -121,7 +121,7 @@ async def test_redis_connection():
             return False
 
         # 삭제 확인
-        deleted_state = await redis_client.load_state(member_id)
+        deleted_state = await redis_client.load_state(memberId)
         if deleted_state is None:
             print("✅ 상태 삭제 확인됨")
         else:
@@ -138,10 +138,10 @@ async def test_redis_connection():
     # 4. 락(Lock) 기능 테스트
     print("\n4. 락(Lock) 기능 테스트")
     try:
-        test_member_id = 888
+        test_memberId = 888
 
         # 락 획득
-        lock_acquired = await redis_client.acquire_lock(test_member_id)
+        lock_acquired = await redis_client.acquire_lock(test_memberId)
         if lock_acquired:
             print("✅ 락 획득 성공")
         else:
@@ -149,7 +149,7 @@ async def test_redis_connection():
             return False
 
         # 중복 락 시도 (실패해야 정상)
-        duplicate_lock = await redis_client.acquire_lock(test_member_id)
+        duplicate_lock = await redis_client.acquire_lock(test_memberId)
         if not duplicate_lock:
             print("✅ 중복 락 방지 확인")
         else:
@@ -157,14 +157,14 @@ async def test_redis_connection():
             return False
 
         # 락 해제
-        await redis_client.release_lock(test_member_id)
+        await redis_client.release_lock(test_memberId)
         print("✅ 락 해제 완료")
 
         # 락 해제 후 재획득 (성공해야 정상)
-        lock_reacquired = await redis_client.acquire_lock(test_member_id)
+        lock_reacquired = await redis_client.acquire_lock(test_memberId)
         if lock_reacquired:
             print("✅ 락 해제 후 재획득 성공")
-            await redis_client.release_lock(test_member_id)
+            await redis_client.release_lock(test_memberId)
         else:
             print("❌ 락 해제 후 재획득 실패")
             return False

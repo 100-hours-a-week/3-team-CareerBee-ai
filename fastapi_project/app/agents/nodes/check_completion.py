@@ -1,3 +1,4 @@
+# app/agents/nodes/check_completion.py
 from app.agents.base_node import BaseNode
 from app.schemas import ResumeAgentState, ResumeAgentUpdateRequest
 
@@ -10,6 +11,7 @@ class CheckCompletionNode(BaseNode):
 
         if self._is_completed(state):
             state.info_ready = True
+            state.pending_questions = []
         return state
 
     def _is_completed(self, state: ResumeAgentState) -> bool:

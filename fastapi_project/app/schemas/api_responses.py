@@ -13,24 +13,24 @@ from datetime import datetime
 
 
 class ResumeAgentInitResponse(BaseModel):
-    member_id: int = Field(..., description="회원 ID")
+    memberId: int = Field(..., description="회원 ID")
     question: str = Field(..., description="첫 번째 질문")
 
     class Config:
-        schema_extra = {"example": {"member_id": 3, "question": "첫번째 질문입니다"}}
+        schema_extra = {"example": {"memberId": 3, "question": "첫번째 질문입니다"}}
 
 
 class ResumeAgentUpdateResponse(BaseModel):
     """이력서 에이전트 업데이트 응답 (FastAPI -> Spring)"""
 
-    member_id: int = Field(..., description="회원 ID")
-    is_complete: bool = Field(..., alias="isComplete", description="완료 여부")
+    memberId: int = Field(..., description="회원 ID")
+    isComplete: bool = Field(..., alias="isComplete", description="완료 여부")
 
     # 추가 질문 있는 경우
     question: Optional[str] = Field(default=None, description="다음 질문 (미완료시)")
 
     # 완료된 경우
-    resume_object_key: Optional[str] = Field(
+    resumeObjectKey: Optional[str] = Field(
         default=None, description="S3 객체 키 (완료시)"
     )
 
@@ -40,17 +40,19 @@ class ResumeAgentUpdateResponse(BaseModel):
                 "continue": {
                     "summary": "추가 질문이 있는 경우",
                     "value": {
-                        "member_id": 3,
-                        "is_complete": False,
+                        "memberId": 3,
+                        "isComplete": False,
                         "question": "두번째 질문입니다",
+                        "resumeObjectKey": None,
                     },
                 },
                 "complete": {
                     "summary": "이력서 생성 완료",
                     "value": {
-                        "member_id": 3,
-                        "is_complete": True,
-                        "resume_object_key": "resume/member_3_20240107_143022.docx",
+                        "memberId": 3,
+                        "isComplete": True,
+                        "question": None,
+                        "resumeObjectKey": "resume/member_3_20240107_143022.docx",
                     },
                 },
             }
@@ -134,7 +136,7 @@ class HealthCheckResponse(BaseModel):
 class AgentStatusResponse(BaseModel):
     """에이전트 상태 조회 응답"""
 
-    member_id: int = Field(..., description="회원 ID")
+    memberId: int = Field(..., description="회원 ID")
     step: str = Field(..., description="현재 단계")
     asked_count: int = Field(..., description="질문한 횟수")
     max_questions: int = Field(..., description="최대 질문 수")
@@ -159,25 +161,23 @@ from datetime import datetime
 # ================================
 
 
-def create_agent_init_response(
-    member_id: int, question: str
-) -> ResumeAgentInitResponse:
+def create_agent_init_response(memberId: int, question: str) -> ResumeAgentInitResponse:
     """에이전트 초기화 응답 생성"""
-    return ResumeAgentInitResponse(member_id=member_id, question=question)
+    return ResumeAgentInitResponse(memberId=memberId, question=question)
 
 
 def create_agent_update_response(
-    member_id: int,
-    is_complete: bool,
+    memberId: int,
+    isComplete: bool,
     question: Optional[str] = None,
-    resume_object_key: Optional[str] = None,
+    resumeObjectKey: Optional[str] = None,
 ) -> ResumeAgentUpdateResponse:
     """에이전트 업데이트 응답 생성"""
     return ResumeAgentUpdateResponse(
-        member_id=member_id,
-        is_complete=is_complete,
+        memberId=memberId,
+        isComplete=isComplete,
         question=question,
-        resume_object_key=resume_object_key,
+        resumeObjectKey=resumeObjectKey,
     )
 
 
@@ -201,7 +201,7 @@ def create_resume_create_response(
 
 
 def create_agent_status_response(
-    member_id: int,
+    memberId: int,
     step: str,
     asked_count: int,
     max_questions: int,
@@ -213,7 +213,7 @@ def create_agent_status_response(
 ) -> AgentStatusResponse:
     """에이전트 상태 조회 응답 생성"""
     return AgentStatusResponse(
-        member_id=member_id,
+        memberId=memberId,
         step=step,
         asked_count=asked_count,
         max_questions=max_questions,

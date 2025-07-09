@@ -1,4 +1,4 @@
-# test_init_update_flow.py
+# fastapi_project/test_init_update_flow.py
 """
 이력서 에이전트 init → update 플로우 전체 테스트
 """
@@ -33,13 +33,13 @@ class FlowTester:
             print(f"❌ 서버 연결 실패: {e}")
             return False
 
-    def test_init_endpoint(self, member_id: int) -> Dict[str, Any]:
+    def test_init_endpoint(self, memberId: int) -> Dict[str, Any]:
         """초기화 엔드포인트 테스트"""
-        print(f"\n🚀 1단계: 초기화 테스트 (member_id={member_id})")
+        print(f"\n🚀 1단계: 초기화 테스트 (memberId={memberId})")
 
         # 요청 데이터 구성
         init_data = {
-            "member_id": member_id,
+            "memberId": memberId,
             "inputs": {
                 "email": "test@example.com",
                 "preferred_job": "AI 엔지니어",
@@ -63,7 +63,7 @@ class FlowTester:
             if response.status_code == 200:
                 result = response.json()
                 print(f"✅ 초기화 성공!")
-                print(f"   - member_id: {result.get('member_id')}")
+                print(f"   - memberId: {result.get('memberId')}")
                 print(f"   - question: {result.get('question')}")
                 return result
             else:
@@ -75,12 +75,12 @@ class FlowTester:
             print(f"❌ 초기화 요청 실패: {e}")
             return None
 
-    def test_update_endpoint(self, member_id: int, answer: str) -> Dict[str, Any]:
+    def test_update_endpoint(self, memberId: int, answer: str) -> Dict[str, Any]:
         """업데이트 엔드포인트 테스트"""
-        print(f"\n🔄 2단계: 업데이트 테스트 (member_id={member_id})")
+        print(f"\n🔄 2단계: 업데이트 테스트 (memberId={memberId})")
 
         # 요청 데이터 구성
-        update_data = {"member_id": member_id, "answer": answer}
+        update_data = {"memberId": memberId, "answer": answer}
 
         try:
             response = self.session.post(
@@ -92,7 +92,7 @@ class FlowTester:
             if response.status_code == 200:
                 result = response.json()
                 print(f"✅ 업데이트 성공!")
-                print(f"   - member_id: {result.get('member_id')}")
+                print(f"   - memberId: {result.get('memberId')}")
                 print(f"   - isComplete: {result.get('isComplete')}")
 
                 if result.get("isComplete"):
@@ -110,13 +110,13 @@ class FlowTester:
             print(f"❌ 업데이트 요청 실패: {e}")
             return None
 
-    def test_status_endpoint(self, member_id: int) -> Dict[str, Any]:
+    def test_status_endpoint(self, memberId: int) -> Dict[str, Any]:
         """상태 조회 엔드포인트 테스트"""
-        print(f"\n📊 상태 확인 (member_id={member_id})")
+        print(f"\n📊 상태 확인 (memberId={memberId})")
 
         try:
             response = self.session.get(
-                f"{self.base_url}/api/v1/resume/agent/status/{member_id}"
+                f"{self.base_url}/api/v1/resume/agent/status/{memberId}"
             )
 
             if response.status_code == 200:
@@ -138,13 +138,13 @@ class FlowTester:
             print(f"❌ 상태 조회 요청 실패: {e}")
             return None
 
-    def test_delete_session(self, member_id: int) -> bool:
+    def test_delete_session(self, memberId: int) -> bool:
         """세션 삭제 테스트 (정리용)"""
-        print(f"\n🗑️ 세션 삭제 (member_id={member_id})")
+        print(f"\n🗑️ 세션 삭제 (memberId={memberId})")
 
         try:
             response = self.session.delete(
-                f"{self.base_url}/api/v1/resume/agent/session/{member_id}"
+                f"{self.base_url}/api/v1/resume/agent/session/{memberId}"
             )
 
             if response.status_code == 200:
@@ -159,7 +159,7 @@ class FlowTester:
             print(f"❌ 세션 삭제 요청 실패: {e}")
             return False
 
-    def run_complete_flow_test(self, member_id: int = 1001) -> bool:
+    def run_complete_flow_test(self, memberId: int = 1001) -> bool:
         """전체 플로우 테스트 실행"""
         print("🎯 === 이력서 에이전트 전체 플로우 테스트 ===")
 
@@ -168,15 +168,15 @@ class FlowTester:
             return False
 
         # 1. 기존 세션 정리
-        self.test_delete_session(member_id)
+        self.test_delete_session(memberId)
 
         # 2. 초기화 테스트
-        init_result = self.test_init_endpoint(member_id)
+        init_result = self.test_init_endpoint(memberId)
         if not init_result:
             return False
 
         # 3. 상태 확인
-        self.test_status_endpoint(member_id)
+        self.test_status_endpoint(memberId)
 
         # 4. 여러 번의 업데이트 테스트
         questions_and_answers = [
@@ -189,22 +189,22 @@ class FlowTester:
 
         for i, answer in enumerate(questions_and_answers, 1):
             print(f"\n--- {i}번째 답변 ---")
-            update_result = self.test_update_endpoint(member_id, answer)
+            update_result = self.test_update_endpoint(memberId, answer)
 
             if not update_result:
                 print(f"❌ {i}번째 업데이트 실패")
                 return False
 
             # 완료되었는지 확인
-            is_complete = update_result.get("isComplete", False)
-            if is_complete:
+            isComplete = update_result.get("isComplete", False)
+            if isComplete:
                 print(f"🎉 {i}번째 답변에서 이력서 생성 완료!")
                 print(f"📄 Object Key: {update_result.get('resumeObjectKey')}")
                 break
 
             # 질문이 없으면서 완료도 아닌 경우 (예상치 못한 상황)
             next_question = update_result.get("question")
-            if not next_question and not is_complete:
+            if not next_question and not isComplete:
                 print(f"⚠️ {i}번째: 질문도 없고 완료도 아님 - 다음 라운드에서 확인")
                 # 한 번 더 시도해볼 수 있도록 continue하지 말고 break
                 time.sleep(2)  # 잠시 대기 후 다음 요청
@@ -213,18 +213,18 @@ class FlowTester:
             time.sleep(1)
 
         # 5. 최종 상태 확인
-        final_status = self.test_status_endpoint(member_id)
+        final_status = self.test_status_endpoint(memberId)
 
         print(f"\n🏁 === 플로우 테스트 완료 ===")
         return True
 
-    def run_error_scenarios_test(self, member_id: int = 2002) -> bool:
+    def run_error_scenarios_test(self, memberId: int = 2002) -> bool:
         """에러 시나리오 테스트"""
         print("\n🚨 === 에러 시나리오 테스트 ===")
 
         # 1. 존재하지 않는 세션에 업데이트 시도
         print("\n1. 존재하지 않는 세션 업데이트 시도")
-        update_result = self.test_update_endpoint(member_id, "답변")
+        update_result = self.test_update_endpoint(memberId, "답변")
         if update_result is None:
             print("✅ 예상대로 실패함")
         else:
@@ -235,7 +235,7 @@ class FlowTester:
         try:
             response = self.session.post(
                 f"{self.base_url}/api/v1/resume/agent/init",
-                json={"member_id": "invalid"},  # 문자열 전송
+                json={"memberId": "invalid"},  # 문자열 전송
             )
             if response.status_code != 200:
                 print("✅ 잘못된 데이터 요청이 예상대로 실패함")
@@ -247,8 +247,8 @@ class FlowTester:
         # 3. 동시성 테스트 (간단)
         print("\n3. 동시 요청 테스트")
         # 정상적인 초기화 먼저
-        self.test_delete_session(member_id)
-        init_result = self.test_init_endpoint(member_id)
+        self.test_delete_session(memberId)
+        init_result = self.test_init_endpoint(memberId)
 
         if init_result:
             # 동시에 업데이트 요청 시도
@@ -257,7 +257,7 @@ class FlowTester:
             results = []
 
             def concurrent_update():
-                result = self.test_update_endpoint(member_id, "동시 요청 답변")
+                result = self.test_update_endpoint(memberId, "동시 요청 답변")
                 results.append(result)
 
             # 두 개의 스레드로 동시 요청

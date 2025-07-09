@@ -21,7 +21,7 @@ class ResumeAgentState(BaseTimestampModel, RedisMixin):
     """
 
     # 기본 정보
-    member_id: int = Field(..., description="회원 ID")
+    memberId: int = Field(..., description="회원 ID")
     inputs: BaseInputsModel = Field(..., description="기본 입력 데이터")
 
     # 질문-답변 관련
@@ -92,7 +92,7 @@ class ResumeAgentState(BaseTimestampModel, RedisMixin):
     def to_redis_dict(self) -> dict:
         """Redis 저장용 dict 변환 (오버라이드)"""
         return {
-            "member_id": self.member_id,
+            "memberId": self.memberId,
             "inputs": self.inputs.dict(),
             "user_inputs": self.user_inputs,
             "answers": self.answers,
@@ -114,7 +114,7 @@ class ResumeAgentState(BaseTimestampModel, RedisMixin):
         """Redis에서 로드할 때 dict에서 변환 (오버라이드)"""
         # 기본값 보장
         safe_data = {
-            "member_id": data["member_id"],
+            "memberId": data["memberId"],
             "inputs": BaseInputsModel(**data["inputs"]),
             "user_inputs": data.get("user_inputs", {}),
             "answers": data.get("answers", []),
@@ -152,15 +152,31 @@ class ResumeAgentState(BaseTimestampModel, RedisMixin):
 class ResumeAgentInitRequest(BaseModel):
     """이력서 에이전트 초기화 요청 (Spring → FastAPI)"""
 
-    member_id: int = Field(..., description="회원 ID")
+    memberId: int = Field(..., description="회원 ID")
     inputs: BaseInputsModel = Field(..., description="기본 입력 데이터")
 
 
 class ResumeAgentUpdateRequest(BaseModel):
     """이력서 에이전트 업데이트 요청 (Spring → FastAPI)"""
 
-    member_id: int = Field(..., description="회원 ID")
+    memberId: int = Field(..., description="회원 ID")
+    inputs: "UpdateInputs" = Field(..., description="업데이트 입력 데이터")
+
+    @property
+    def answer(self) -> str:
+        """API 명세에 따른 답변 추출"""
+        return self.inputs.answer
+
+
+class UpdateInputs(BaseModel):
+    """업데이트 요청의 inputs 부분"""
+
     answer: str = Field(..., description="사용자 답변")
+
+    class Config:
+        schema_extra = {
+            "example": {"answer": "커리어비가 가장 열심히한 프로젝트입니다."}
+        }
 
 
 class ResumeCreateRequest(BaseModel):
@@ -204,10 +220,10 @@ InputsModel = BaseInputsModel  # 별칭
 # ================================
 
 
-def create_initial_state(member_id: int, inputs: BaseInputsModel) -> ResumeAgentState:
+def create_initial_state(memberId: int, inputs: BaseInputsModel) -> ResumeAgentState:
     """초기 상태 생성 헬퍼 함수"""
     return ResumeAgentState(
-        member_id=member_id,
+        memberId=memberId,
         inputs=inputs,
         user_inputs={},
         answers=[],

@@ -5,7 +5,7 @@
 """
 
 # 기본 모델들
-from .base import BaseInputsModel, BaseTimestampModel, QuestionAnswerPair
+from .base import BaseInputsModel, BaseTimestampModel, QuestionAnswerPair, RedisMixin
 
 # 이력서 관련 모델들
 from .resume_models import (
@@ -60,12 +60,15 @@ __all__ = [
     "BaseInputsModel",
     "BaseTimestampModel",
     "QuestionAnswerPair",
+    "RedisMixin",
     # 이력서 모델
     "ResumeAgentState",
     "ResumeAgentInitRequest",
     "ResumeAgentUpdateRequest",
     "ResumeCreateRequest",
     "InputsModel",
+    "create_initial_state",
+    "update_state_with_answer",
     # 응답 모델
     "ResumeAgentInitResponse",
     "ResumeAgentUpdateResponse",
