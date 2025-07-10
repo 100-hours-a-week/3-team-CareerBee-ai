@@ -42,6 +42,80 @@ class CreateResumeNode(LLMBaseNode):
             f"환경: {self.environment}, S3 사용: {self.use_s3}, S3 가용: {self.s3_available}"
         )
 
+    def preprocess_state_data(self, state: ResumeAgentState) -> ResumeAgentState:
+        """이력서 생성 전 데이터 전처리"""
+
+        # 빈 값 처리
+        if state.inputs.company_name in ["", "없음", None, "backend"]:
+            state.inputs.company_name = "신입"
+
+        # 직무명 표준화
+        job_mapping = {
+            "BACKEND": "Backend Engineer",
+            "FRONTEND": "Frontend Engineer",
+            "FULLSTACK": "Full-stack Engineer",
+            "백엔드": "Backend Engineer",
+            "프론트엔드": "Frontend Engineer",
+            "풀스택": "Full-stack Engineer",
+        }
+        state.inputs.preferred_job = job_mapping.get(
+            state.inputs.preferred_job.upper(), state.inputs.preferred_job
+        )
+        # 전공 여부 명확화
+        if state.inputs.major_type == "MAJOR":
+            state.inputs.major_type = "컴퓨터공학 전공"
+        elif state.inputs.major_type == "NON_MAJOR":
+            state.inputs.major_type = "비전공자"
+
+        return state
+
+    def _format_work_period(self, months: int) -> str:
+        """근무 기간을 읽기 쉬운 형식으로 변환"""
+        if not months or months == 0:
+            return "신입"
+
+        years = months // 12
+        remaining_months = months % 12
+
+        if years > 0:
+            return (
+                f"{years}년 {remaining_months}개월"
+                if remaining_months > 0
+                else f"{years}년"
+            )
+        else:
+            return f"{remaining_months}개월"
+
+    def categorize_qna(self, answers):
+        """질문-응답을 카테고리별로 분류"""
+        categories = {
+            "기술역량": [],
+            "프로젝트": [],
+            "경력": [],
+            "교육": [],
+            "기타": [],
+        }
+
+        for qa in answers:
+            question = qa["question"].lower()
+            if any(
+                word in question
+                for word in ["기술", "스택", "언어", "프레임워크", "툴", "tool"]
+            ):
+                categories["기술역량"].append(qa)
+            elif any(
+                word in question for word in ["프로젝트", "개발", "구현", "서비스"]
+            ):
+                categories["프로젝트"].append(qa)
+            elif any(word in question for word in ["경력", "회사", "직무", "업무"]):
+                categories["경력"].append(qa)
+            elif any(word in question for word in ["교육", "학습", "공부", "강의"]):
+                categories["교육"].append(qa)
+            else:
+                categories["기타"].append(qa)
+
+        return categories
+
     def _check_s3_availability(self) -> bool:
         """S3 업로드 기능 사용 가능 여부 확인"""
         try:
@@ -71,16 +145,29 @@ class CreateResumeNode(LLMBaseNode):
 
     async def execute(self, state: ResumeAgentState) -> ResumeAgentState:
         try:
+            state = self.preprocess_state_data(state)
             prompt = self._build_resume_prompt(state)
 
             # 시스템 프롬프트 정의
-            system_prompt = """당신은 전문 이력서 작성 컨설턴트입니다. 
-주어진 정보를 바탕으로 고품질의 마크다운 형식 이력서를 작성해주세요.
-다음 구조를 따라주세요:
-- 명확한 헤딩 구조 (# ## ### 사용)
-- 구체적이고 임팩트 있는 표현
-- 기술적 경험을 부각
-- 프로젝트 성과를 정량적으로 표현"""
+            system_prompt = """당신은 10년 이상의 경력을 가진 전문 이력서 작성 컨설턴트입니다. 
+            다음 원칙을 반드시 지켜주세요:
+
+            1. 형식:
+                - 표준 이력서 형식 준수 (Contacts -> 지원 직무 -> 보유 역량 -> 경력 -> 프로젝트 -> 교육 -> 기타)
+                - 마크다운 헤딩은 # (대제목), ## (중제목), ### (소제목)만 사용
+                - 불렛 포인트는 '-' 사용
+
+            2. 내용:
+                - 구체적이고 측정 가능한 성과 위주로 작성
+                - 기술 스택은 정확한 명칭 사용 (예: Spring Framework, Docker, AWS EC2)
+                - 모든 경험에 기간 명시
+                - 정보가 없는 섹션은 제목 생성 후 작성할 수 있는 칸만 생성
+                - 가상의 내용이나 예시 작성시 [예시] 명시 후 작성
+            
+            3. 문체:
+                - 간결하고 임팩트 있는 동사 사용
+                - 수동태보다 능동태 선호
+                - 전문 용어는 업계 표준 사용"""
 
             # LLM으로 이력서 생성 (시스템 프롬프트 포함)
             content = await self._safe_llm_call(
@@ -249,31 +336,76 @@ class CreateResumeNode(LLMBaseNode):
             raise FileNotFoundError(f"파일을 생성할 수 없습니다: {abs_path}")
 
     def _build_resume_prompt(self, state: ResumeAgentState) -> str:
-        # LLM에 보낼 요약 정보
+        # QnA 카테고리화
+        categorized_qa = self.categorize_qna(state.answers)
+        # 카테고리별 QnA 포맷팅
+        formatted_qa = ""
+        for category, qas in categorized_qa.items():
+            if qas:  # 해당 카테고리에 QnA가 있는 경우만
+                formatted_qa += f"\n[{category}]\n"
+                for qa in qas:
+                    formatted_qa += f"Q: {qa['question']}\nA: {qa['answer']}\n\n"
+
+        work_period_display = self._format_work_period(state.inputs.work_period)
+
         base_info = f"""
     이메일: {state.inputs.email}
     희망 직무: {state.inputs.preferred_job}
-    전공 여부: {state.inputs.major_type}
+    전공: {state.inputs.major_type}
     재직 회사: {state.inputs.company_name}
-    직무명: {state.inputs.position}
-    재직 기간: {state.inputs.work_period}개월
-    자격증 수: {state.inputs.certification_count}
-    프로젝트 수: {state.inputs.project_count}
+    직무: {state.inputs.position}
+    경력 기간: {work_period_display}
+    보유 자격증: {state.inputs.certification_count}개
+    수행 프로젝트: {state.inputs.project_count}개
     추가 경험: {state.inputs.additional_experiences}
         """
 
-        qna_info = "\n".join(
-            [f"Q: {a['question']}\nA: {a['answer']}" for a in state.answers]
-        )
-
         return f"""
-    다음은 이력서에 포함될 정보입니다. 아래 정보를 기반으로 고급 이력서 초안을 마크다운 형식으로 작성해주세요. 항목: 보유 기술 역량, 경력 사항, 프로젝트 경험, 교육 및 학습, 수상 경력, 자격증 등
+    다음 정보를 바탕으로 전문적인 이력서를 작성해주세요. 
 
-    [입력 정보]
+    [작성 원칙] 
+    1. 구체적이고 정량적인 성과 중심으로 작성
+    2. 기술 스택과 도구를 명확히 명시
+    3. 프로젝트 경험은 문제-해결-성과 구조로 작성
+    4. 0개 프로젝트, 0개 자격증 등은 '프로젝트', '자격증' 칸만 생성. 
+    5. 가상의 내용이나 예시는 [예시]라고 표시 후 작성. 
+
+    [이력서 구조]
+    # Contacts
+    - 이메일 정보만 포함
+
+    # 지원 직무
+    - {state.inputs.preferred_job}
+
+    # 보유 역량 요약
+    - 기술별로 그룹핑하여 작성
+    - Backend Engineering, Frontend Engineering, DevOps 등으로 분류
+
+    # Careers
+    - 회사명 / 직무 @ 팀명 (기간)
+    - 주요 업무 및 성과를 불렛 포인트로 작성
+
+    # Projects  
+    - 프로젝트명 / 간단한 설명 [링크]
+    - 사용 기술, 역할, 성과를 구체적으로 작성
+
+    # Education
+    - 학교명 / 전공 (기간)
+
+    # ETC
+    - 자격증, 수상 경력, 오픈소스 기여 등
+
+    [입력된 기본 정보]
     {base_info}
 
-    [질문 응답]
-    {qna_info}
+    [카테고리별 상세 정보]
+    {formatted_qa}
+
+
+    위 정보를 바탕으로 표준 이력서 형식에 맞춰 작성하되, 
+    - 정보가 부족한 부분은 [예시]를 생성해서 작성
+    - 신입인 경우 Projects, Education 등에 더 집중
+    - 경력자인 경우 Careers 섹션을 상세히 작성
     """
 
     async def _generate_resume_content(self, prompt: str) -> str:
@@ -295,16 +427,38 @@ class CreateResumeNode(LLMBaseNode):
         html = markdown(markdown_text)
         soup = BeautifulSoup(html, "html.parser")
 
+        # 스타일 정의
+        styles = {
+            "h1": {"size": Pt(16), "bold": True, "space_after": Pt(12)},
+            "h2": {"size": Pt(14), "bold": True, "space_after": Pt(10)},
+            "h3": {"size": Pt(12), "bold": True, "space_after": Pt(8)},
+            "p": {"size": Pt(11), "space_after": Pt(6)},
+            "li": {"size": Pt(11), "space_after": Pt(4)},
+        }
+
         for element in soup.descendants:
             if element.name == "h1":
-                section = doc.add_heading(element.get_text(), level=1)
-                self._add_horizontal_line(section)
+                paragraph = doc.add_heading(element.get_text(), level=1)
+                paragraph.runs[0].font.size = styles["h1"]["size"]
+                paragraph.paragraph_format.space_after = styles["h1"]["space_after"]
+                # 섹션 구분선 추가
+                self._add_horizontal_line(paragraph)
+
             elif element.name == "h2":
-                doc.add_heading(element.get_text(), level=2)
+                paragraph = doc.add_heading(element.get_text(), level=2)
+                paragraph.runs[0].font.size = styles["h2"]["size"]
+                paragraph.paragraph_format.space_after = styles["h2"]["space_after"]
+
             elif element.name == "p":
-                doc.add_paragraph(element.get_text())
+                paragraph = doc.add_paragraph(element.get_text())
+                paragraph.runs[0].font.size = styles["p"]["size"]
+                paragraph.paragraph_format.space_after = styles["p"]["space_after"]
+
             elif element.name == "li":
-                doc.add_paragraph("▪ " + element.get_text())
+                # 들여쓰기와 함께 불렛 포인트 추가
+                paragraph = doc.add_paragraph(element.get_text(), style="List Bullet")
+                paragraph.runs[0].font.size = styles["li"]["size"]
+                paragraph.paragraph_format.left_indent = Pt(20)
 
     def _create_fallback_resume(self, state: ResumeAgentState) -> str:
         """파일 생성 실패시 기본 이력서 텍스트 생성"""
