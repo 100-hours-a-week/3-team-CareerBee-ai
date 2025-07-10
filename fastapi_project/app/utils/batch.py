@@ -1,6 +1,10 @@
 # app/utils/batch.py
+import os
 import json
 import requests
+import dotenv import load_dotenv
+
+load_dotenv()
 
 def update_issues_in_batches():
     with open("app/data/latest_issues.json", "r", encoding="utf-8") as f:
@@ -19,7 +23,7 @@ def update_issues_in_batches():
         })
     try:
         # 2. PATCH 요청 (배치 분할 없이 한번에)
-        SPRING_SERVER_URL = "https://api.careerbee.co.kr"
+        SPRING_SERVER_URL = os.getenv("SPRING_SERVER_URL")
         resp = requests.patch(
             f"{SPRING_SERVER_URL}/api/v1/companies/recent-issue",
             json=payload,
