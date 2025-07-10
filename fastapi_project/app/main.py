@@ -56,19 +56,19 @@ async def lifespan(app: FastAPI):
     # 외부 서비스 연결 확인
     await check_external_services()
 
-    # #스케줄러 시작
-    # logger.info("백그라운드 스케줄러 시작")
-    # scheduler = BackgroundScheduler()
-    # scheduler.add_job(
-    #     run_summary_pipeline,
-    #     "cron",
-    #     day_of_week="mon",
-    #     hour=12,
-    #     timezone=timezone("Asia/Seoul"),
-    # )
-    # scheduler.start()
+    # 스케줄러 시작
+    logger.info("백그라운드 스케줄러 시작")
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(
+        run_summary_pipeline,
+        "cron",
+        day_of_week="mon",
+        hour=12,
+        timezone=timezone("Asia/Seoul"),
+    )
+    scheduler.start()
 
-    # app.state.scheduler = scheduler
+    app.state.scheduler = scheduler
 
     yield
 
@@ -169,42 +169,42 @@ def health_check():
 
 
 # 고급 헬스 체크
-# @app.get("/health/detailed", response_model=HealthCheckResponse, tags=["Health"])
-# async def detailed_health_check():
-#     """상세 서비스 헬스 체크 (Redis, LLM, S3 상태 포함)"""
-#     try:
-#         redis_client = get_redis_client()
-#         redis_health = await redis_client.health_check()
+@app.get("/health/detailed", response_model=HealthCheckResponse, tags=["Health"])
+async def detailed_health_check():
+    """상세 서비스 헬스 체크 (Redis, LLM, S3 상태 포함)"""
+    try:
+        redis_client = get_redis_client()
+        redis_health = await redis_client.health_check()
 
-#         # 전체 서비스 상태 확인
-#         all_services = await check_external_services()
-#         all_services.update(redis_health)
+        # 전체 서비스 상태 확인
+        all_services = await check_external_services()
+        all_services.update(redis_health)
 
-#         # 스케줄러 상태 추가
-#         scheduler_status = (
-#             "running"
-#             if hasattr(app.state, "scheduler") and app.state.scheduler.running
-#             else "stopped"
-#         )
-#         all_services["scheduler"] = {"status": scheduler_status}
+        # 스케줄러 상태 추가
+        scheduler_status = (
+            "running"
+            if hasattr(app.state, "scheduler") and app.state.scheduler.running
+            else "stopped"
+        )
+        all_services["scheduler"] = {"status": scheduler_status}
 
-#         # 전체적인 건강 상태 판단
-#         overall_status = "healthy"
-#         if not redis_health.get("redis_connected", False):
-#             overall_status = "degraded"  # Redis 없어도 fallback으로 동작
+        # 전체적인 건강 상태 판단
+        overall_status = "healthy"
+        if not redis_health.get("redis_connected", False):
+            overall_status = "degraded"  # Redis 없어도 fallback으로 동작
 
-#         # LLM 서비스가 실패하면 unhealthy
-#         if not all_services.get("openai", {}).get("connected", False):
-#             overall_status = "unhealthy"
-#         return HealthCheckResponse(
-#             status=overall_status, services=all_services, version="1.0.0"
-#         )
+        # LLM 서비스가 실패하면 unhealthy
+        if not all_services.get("openai", {}).get("connected", False):
+            overall_status = "unhealthy"
+        return HealthCheckResponse(
+            status=overall_status, services=all_services, version="1.0.0"
+        )
 
-#     except Exception as e:
-#         logger.error(f"상세 헬스체크 실패: {e}")
-#         return HealthCheckResponse(
-#             status="unhealthy", services={"error": str(e)}, version="1.0.0"
-#         )
+    except Exception as e:
+        logger.error(f"상세 헬스체크 실패: {e}")
+        return HealthCheckResponse(
+            status="unhealthy", services={"error": str(e)}, version="1.0.0"
+        )
 
 
 @app.get("/", tags=["Root"])

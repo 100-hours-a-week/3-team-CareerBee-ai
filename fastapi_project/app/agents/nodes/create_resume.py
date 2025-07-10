@@ -146,7 +146,7 @@ class CreateResumeNode(LLMBaseNode):
             doc.add_heading("이력서", level=0).alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
 
             # 기본 정보 섹션
-            self._add_basic_info_section(doc, state.inputs)
+            # self._add_basic_info_section(doc, state.inputs)
 
             # LLM 생성 내용 섹션
             self._render_llm_content_stylized(content, doc)
@@ -212,12 +212,12 @@ class CreateResumeNode(LLMBaseNode):
 
                 # 문서 생성
                 doc = Document()
-                doc.add_heading("이력서", level=0).alignment = (
-                    WD_PARAGRAPH_ALIGNMENT.LEFT
-                )
+                # doc.add_heading("이력서", level=0).alignment = (
+                #     WD_PARAGRAPH_ALIGNMENT.LEFT
+                # )
 
                 # 기본 정보 섹션
-                self._add_basic_info_section(doc, state.inputs)
+                # self._add_basic_info_section(doc, state.inputs)
 
                 # LLM 생성 내용 섹션
                 self._render_llm_content_stylized(content, doc)
@@ -267,7 +267,7 @@ class CreateResumeNode(LLMBaseNode):
         )
 
         return f"""
-    다음은 이력서에 포함될 정보입니다. 아래 정보를 기반으로 고급 이력서 초안을 마크다운 형식으로 작성해주세요. 항목: 경력 사항, 프로젝트, 기술 역량, 자격증 등
+    다음은 이력서에 포함될 정보입니다. 아래 정보를 기반으로 고급 이력서 초안을 마크다운 형식으로 작성해주세요. 항목: 보유 기술 역량, 경력 사항, 프로젝트 경험, 교육 및 학습, 수상 경력, 자격증 등
 
     [입력 정보]
     {base_info}
@@ -283,12 +283,12 @@ class CreateResumeNode(LLMBaseNode):
         )
         return content
 
-    def _add_basic_info_section(self, doc: Document, inputs):
-        """기본 정보 섹션 추가"""
-        doc.add_heading("기본 정보", level=1)
-        doc.add_paragraph(f"이메일: {inputs.email}")
-        doc.add_paragraph(f"희망 직무: {inputs.preferred_job}")
-        doc.add_paragraph(f"전공 여부: {inputs.major_type}")
+    # def _add_basic_info_section(self, doc: Document, inputs):
+    #     """기본 정보 섹션 추가"""
+    #     doc.add_heading("기본 정보", level=1)
+    #     doc.add_paragraph(f"이메일: {inputs.email}")
+    #     doc.add_paragraph(f"희망 직무: {inputs.preferred_job}")
+    #     doc.add_paragraph(f"전공 여부: {inputs.major_type}")
 
     def _render_llm_content_stylized(self, markdown_text: str, doc: Document):
         """마크다운 텍스트를 Word 문서에 스타일 적용하여 렌더링"""
