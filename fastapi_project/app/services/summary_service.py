@@ -8,5 +8,5 @@ def run_summary_pipeline():
     corp_list = df["기업명"].dropna().unique().tolist()
 
     generate_issue_summaries(corp_list)
-    update_issues_in_batches(batch_size=10)
+    update_issues_in_batches()
     print("✅ 파이프라인 완료")
