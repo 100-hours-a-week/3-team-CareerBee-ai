@@ -10,7 +10,10 @@ if os.path.exists("db/chroma"):
 else:
     print("ℹ️ 기존 Chroma 디렉토리가 없어서 삭제 생략.")
 
-def load_and_embed_reports(csv_path: str = "data/catch_company_details.csv"):
+
+def load_and_embed_reports(
+    csv_path: str = "fastapi_project/app/data/catch_company_details.csv",
+):
     """
     CSV 파일을 읽고 공시 정보를 Chroma에 저장
     """
@@ -23,7 +26,8 @@ def load_and_embed_reports(csv_path: str = "data/catch_company_details.csv"):
             add_report_to_chroma(summary.strip(), corp)
             count += 1
     print(f"✅ CSV 공시 자료 {count}건 저장 완료.")
-    
- # 실행
+
+
+# 실행
 if __name__ == "__main__":
     load_and_embed_reports()

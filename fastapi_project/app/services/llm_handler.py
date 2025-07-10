@@ -1,11 +1,9 @@
-import httpx
-import json
+# app/services/llm_handler.py
 import time
-
+import traceback
 from langchain_community.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
-
 from app.schemas.resume_extract import ResumeInfo
 
 # 1. 응답 스키마 정의
@@ -67,55 +65,59 @@ def safe_int(val):
 
 # 5. LLM 추론 함수
 async def extract_info_from_resume(resume_text: str) -> dict:
-    try:
-        format_instructions = parser.get_format_instructions()
-        filled_prompt = prompt.format_messages(
-            text=resume_text.strip()[:6000],
-            format_instructions=format_instructions
-        )
+    fallback_result = {
+        "certification_count": 0,
+        "project_count": 0,
+        "major_type": "NON_MAJOR",
+        "company_name": None,
+        "work_period": 0,
+        "position": None,
+        "additional_experiences": None
+    }
 
-        start = time.time()
-        response = await llm.ainvoke(filled_prompt)
-        end = time.time()
+    MAX_RETRY = 2
+    for attempt in range(MAX_RETRY):
+        try:
+            format_instructions = parser.get_format_instructions()
+            filled_prompt = prompt.format_messages(
+                text=resume_text.strip()[:6000],
+                format_instructions=format_instructions
+            )
 
-        content = response.content
-        print(f"\n⏱️ 응답 시간: {end - start:.2f}초")
-        print("🧠 LLM 응답 원문:\n", content)
+            start = time.time()
+            response = await llm.ainvoke(filled_prompt)
+            end = time.time()
 
-        parsed_dict = parser.parse(content)
+            content = response.content
+            print(f"\n⏱️ 응답 시간: {end - start:.2f}초")
+            print("🧠 LLM 응답 원문:\n", content)
 
-        # position 필드 정리: 리스트 → 문자열 처리
-        position_raw = parsed_dict.get("position")
-        if isinstance(position_raw, list):
-            position = position_raw[0] if position_raw else None
-        else:
-            position = position_raw or None
-        
-        # additional_experiences 방어 처리
-        add_exp = parsed_dict.get("additional_experiences")
-        if isinstance(add_exp, list):
-		        add_exp = "\n".join(add_exp)
-        elif not isinstance(add_exp, str):
-		        add_exp = None
+            parsed_dict = parser.parse(content)
 
-        return ResumeInfo(
-            certification_count=safe_int(parsed_dict.get("certification_count")),
-            project_count=safe_int(parsed_dict.get("project_count")),
-            major_type=parsed_dict.get("major_type", "NON_MAJOR"),
-            company_name=parsed_dict.get("company_name") or None,
-            work_period=safe_int(parsed_dict.get("work_period")),
-            position=position,
-            additional_experiences=add_exp
-        ).dict()
+            # position 필드 정리
+            position_raw = parsed_dict.get("position")
+            position = position_raw[0] if isinstance(position_raw, list) and position_raw else position_raw or None
 
-    except httpx.HTTPStatusError as e:
-        print("❌ HTTP 오류:", e.response.status_code, e.response.text)
-        raise ValueError("LLM API 호출 오류") from e
+            # additional_experiences 필드 정리
+            add_exp = parsed_dict.get("additional_experiences")
+            if isinstance(add_exp, list):
+                add_exp = "\n".join(add_exp)
+            elif not isinstance(add_exp, str):
+                add_exp = None
 
-    except json.JSONDecodeError as e:
-        print("❌ JSON 파싱 오류:", e)
-        raise ValueError("LLM 응답 파싱 실패") from e
+            return ResumeInfo(
+                certification_count=safe_int(parsed_dict.get("certification_count")),
+                project_count=safe_int(parsed_dict.get("project_count")),
+                major_type=parsed_dict.get("major_type", "NON_MAJOR"),
+                company_name=parsed_dict.get("company_name") or None,
+                work_period=safe_int(parsed_dict.get("work_period")),
+                position=position,
+                additional_experiences=add_exp
+            ).dict()
 
-    except Exception as e:
-        print("❌ 일반 예외 발생:", e)
-        raise ValueError("LLM 응답 처리 실패") from e
+        except Exception as e:
+            print(f"⚠️ LLM 추론 시도 {attempt + 1} 실패:", e)
+            traceback.print_exc()
+            if attempt == MAX_RETRY - 1:
+                print("⚠️ LLM 추론 2회 실패. fallback 반환")
+                return fallback_result

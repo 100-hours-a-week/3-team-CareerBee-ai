@@ -9,9 +9,7 @@ router = APIRouter()
 
 @router.post("/feedback/create", response_model=FeedbackResponse)
 async def create_feedback(request: FeedbackRequest):
-    feedback = await run_in_threadpool(
-        generate_feedback, request.question, request.answer
-    )
+    feedback = await generate_feedback(request.question, request.answer)
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
