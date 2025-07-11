@@ -150,12 +150,16 @@ class CreateResumeNode(LLMBaseNode):
 
             # 시스템 프롬프트 정의
             system_prompt = """당신은 10년 이상의 경력을 가진 전문 이력서 작성 컨설턴트입니다. 
+            
             다음 원칙을 반드시 지켜주세요:
 
             1. 형식:
                 - 표준 이력서 형식 준수 (Contacts -> 지원 직무 -> 보유 역량 -> 경력 -> 프로젝트 -> 교육 -> 기타)
                 - 마크다운 헤딩은 # (대제목), ## (중제목), ### (소제목)만 사용
                 - 불렛 포인트는 '-' 사용
+            2. 금지 사항:
+                - "기본 정보", "개인 정보" 등의 중복 섹션 생성 금지
+                - 동일한 정보를 여러 섹션에 반복하지 않음
 
             2. 내용:
                 - 구체적이고 측정 가능한 성과 위주로 작성
@@ -230,7 +234,7 @@ class CreateResumeNode(LLMBaseNode):
         # 2. Word 문서 생성
         def create_doc():
             doc = Document()
-            doc.add_heading("이력서", level=0).alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
+            # doc.add_heading("이력서", level=0).alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
 
             # 기본 정보 섹션
             # self._add_basic_info_section(doc, state.inputs)
@@ -299,9 +303,9 @@ class CreateResumeNode(LLMBaseNode):
 
                 # 문서 생성
                 doc = Document()
-                # doc.add_heading("이력서", level=0).alignment = (
-                #     WD_PARAGRAPH_ALIGNMENT.LEFT
-                # )
+                doc.add_heading("이력서", level=0).alignment = (
+                    WD_PARAGRAPH_ALIGNMENT.LEFT
+                )
 
                 # 기본 정보 섹션
                 # self._add_basic_info_section(doc, state.inputs)
@@ -364,36 +368,41 @@ class CreateResumeNode(LLMBaseNode):
     다음 정보를 바탕으로 전문적인 이력서를 작성해주세요. 
 
     [작성 원칙] 
-    1. 구체적이고 정량적인 성과 중심으로 작성
-    2. 기술 스택과 도구를 명확히 명시
-    3. 프로젝트 경험은 문제-해결-성과 구조로 작성
-    4. 0개 프로젝트, 0개 자격증 등은 '프로젝트', '자격증' 칸만 생성. 
-    5. 가상의 내용이나 예시는 [예시]라고 표시 후 작성. 
+    1. **문서 최상단에 "# 이력서" 제목을 한 번만 작성**
+    2. 구체적이고 정량적인 성과 중심으로 작성
+    3. 기술 스택과 도구를 명확히 명시
+    4. 프로젝트 경험은 문제-해결-성과 구조로 작성
+    5. 비어있는 섹션(0개 프로젝트, 0개 자격증 등)은 '프로젝트', '자격증' 칸만 생성. 
+    6. 가상의 내용이나 예시는 [예시]라고 표시 후 작성. 
+    7. "기본 정보" 섹션은 절대 만들지 말 것. 
 
     [이력서 구조]
-    # Contacts
-    - 이메일 정보만 포함
+    # 이력서  ← 최상단 제목 (한 번만)
 
-    # 지원 직무
+    ## Contacts
+    - 이메일: {state.inputs.email}
+
+    ## 지원 직무
     - {state.inputs.preferred_job}
 
-    # 보유 역량 요약
+    ## 보유 역량 요약
     - 기술별로 그룹핑하여 작성
-    - Backend Engineering, Frontend Engineering, DevOps 등으로 분류
 
-    # Careers
+    ## Careers
     - 회사명 / 직무 @ 팀명 (기간)
     - 주요 업무 및 성과를 불렛 포인트로 작성
 
-    # Projects  
+    ## Projects  
     - 프로젝트명 / 간단한 설명 [링크]
     - 사용 기술, 역할, 성과를 구체적으로 작성
 
-    # Education
+    ## Education
     - 학교명 / 전공 (기간)
 
-    # ETC
+    ## ETC
     - 자격증, 수상 경력, 오픈소스 기여 등
+
+    **중요: "기본 정보"라는 섹션은 만들지 마세요. 이메일은 Contacts 섹션에, 희망 직무는 '지원 직무' 섹션에만 포함하세요.**
 
     [입력된 기본 정보]
     {base_info}

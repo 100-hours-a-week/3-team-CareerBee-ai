@@ -12,6 +12,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
 from app.routes.resume_create import router as resume_create_router
+
 from app.routes.health import router as health_router
 from app.routes.resume_extract import router as resume_extract_router
 from app.routes.feedback import router as feedback_router

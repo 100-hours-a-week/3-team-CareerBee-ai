@@ -1,10 +1,18 @@
+# fastapi_project/streamlit_ui/app_ui.py
+import sys
+import os
+from pathlib import Path
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import streamlit as st
 import requests
 import logging
-import os
+import requests
+
 from copy import deepcopy
 from typing import Dict, Any, Optional
-from app.schemas.resume_agent import InputsModel
+from app.schemas import InputsModel, BaseInputsModel
 
 # 로깅 설정
 logging.basicConfig(
@@ -15,6 +23,10 @@ logger = logging.getLogger(__name__)
 # 설정
 FASTAPI_BASE_URL = "http://localhost:8000"
 REQUEST_TIMEOUT = 30  # 30초 타임아웃
+
+# base_dir = Path(__file__).resolve().parent  # 현재 스크립트 위치
+# resume_dir = base_dir / "resume"
+# resume_dir.mkdir(exist_ok=True)
 
 
 class ResumeAppUI:
@@ -27,6 +39,7 @@ class ResumeAppUI:
         """세션 상태 초기화"""
         if "state" not in st.session_state:
             st.session_state["state"] = {
+                "memberId": None,
                 "inputs": {},
                 "user_inputs": {},
                 "answers": [],
@@ -69,7 +82,7 @@ class ResumeAppUI:
                 response = requests.post(
                     url,
                     json=payload,
-                    timeout=REQUEST_TIMEOUT,
+                    timeout=300,
                     headers={"Content-Type": "application/json"},
                 )
 
@@ -153,6 +166,7 @@ class ResumeAppUI:
         st.write("아래 정보를 입력하여 맞춤형 이력서를 생성해보세요.")
 
         with st.form("init_form"):
+
             col1, col2 = st.columns(2)
 
             with col1:
@@ -199,17 +213,43 @@ class ResumeAppUI:
 
                 if self.validate_initial_inputs(inputs):
                     result = self.make_api_request(
-                        "/resume/agent/init", {"inputs": inputs}
+                        "/api/v1/resume/agent/init",
+                        {"inputs": inputs, "memberId": 3},
                     )
                     if result:
-                        result["inputs"] = self.ensure_inputs_dict(result["inputs"])
-                        result["step"] = "questioning"
-                        st.session_state["state"] = result
+                        # ✅ inputs는 응답에 없으므로 원래 값 사용
+                        st.session_state["state"] = {
+                            "memberId": result.get("memberId", 3),
+                            "inputs": inputs,  # 원래 입력값 유지
+                            "step": "questioning",
+                            "pending_questions": [result.get("question", "")],
+                            "answers": [],
+                            "asked_count": 0,
+                            "user_inputs": {},
+                            "info_ready": False,
+                            "resume": "",
+                            "docx_path": "",
+                        }
                         st.rerun()
 
     def render_questioning_phase(self, state: Dict[str, Any]):
         """질문-답변 단계"""
         pending = state.get("pending_questions", [])
+
+        # ✅ asked_count가 3 이상이면 강제로 info_ready 설정
+        if state.get("asked_count", 0) >= 3:
+            st.info("💡 3개 이상의 질문에 답변했으므로 이력서를 생성합니다...")
+            payload = deepcopy(state)
+            payload["inputs"] = self.ensure_inputs_dict(payload["inputs"])
+            payload["info_ready"] = True  # 강제로 완료 플래그 설정
+
+            result = self.make_api_request("/api/v1/resume/agent/update", payload)
+            if result:
+                result["inputs"] = self.ensure_inputs_dict(result["inputs"])
+                result["step"] = "completed"
+                st.session_state["state"] = result
+                st.rerun()
+            return  # 완료되었으니 이후 진행 생략
 
         if not pending:
             # 새로운 질문 생성 요청
@@ -217,9 +257,15 @@ class ResumeAppUI:
             payload = deepcopy(state)
             payload["inputs"] = self.ensure_inputs_dict(payload["inputs"])
 
-            result = self.make_api_request("/resume/agent/update", payload)
+            result = self.make_api_request("/api/v1/resume/agent/update", payload)
             if result:
                 result["inputs"] = self.ensure_inputs_dict(result["inputs"])
+                result["memberId"] = state.get("memberId", 3)  # memberId 저장
+                result["step"] = "questioning"
+                result["pending_questions"] = [result.get("question", "")]
+                result["answers"] = []
+                result["asked_count"] = 0
+                result["user_inputs"] = {}
                 result["step"] = "questioning"
                 st.session_state["state"] = result
                 st.rerun()
@@ -272,17 +318,36 @@ class ResumeAppUI:
                         state["pending_questions"] = pending[1:]
                         state["asked_count"] += 1
 
-                        payload = deepcopy(state)
-                        payload["inputs"] = self.ensure_inputs_dict(payload["inputs"])
+                        # API 요청
+                        request_data = {
+                            "memberId": state.get("memberId", 3),
+                            "inputs": {"answer": user_answer.strip()},
+                        }
+                        result = self.make_api_request(
+                            "/api/v1/resume/agent/update", request_data
+                        )
 
-                        result = self.make_api_request("/resume/agent/update", payload)
                         if result:
-                            result["inputs"] = self.ensure_inputs_dict(result["inputs"])
-                            result["step"] = (
-                                "completed"
-                                if result.get("info_ready")
-                                else "questioning"
-                            )
+                            if result.get("isComplete"):
+                                result["info_ready"] = True
+                                result["step"] = "completed"
+
+                                # ✅ resumeObjectKey → docx_path로 저장
+                                result["docx_path"] = result.get("resumeObjectKey", "")
+
+                                # ✅ resume 내용도 state에 저장
+                                result["resume"] = result.get("resume", "")
+                            else:
+                                next_question = result.get("question")
+                                if next_question:
+                                    result["pending_questions"] = [next_question]
+                                    result["step"] = "questioning"
+
+                            # ✅ 이전 상태 병합
+                            result["asked_count"] = state["asked_count"]
+                            result["answers"] = state["answers"]
+                            result["user_inputs"] = state["user_inputs"]
+
                             st.session_state["state"] = result
                             st.rerun()
 
@@ -310,8 +375,13 @@ class ResumeAppUI:
         resume_content = state.get("resume", "")
         if resume_content:
             st.subheader("📄 생성된 이력서 내용")
-            st.text_area("", value=resume_content, height=300, disabled=True)
+            # 마크다운으로 렌더링
+            with st.container():
+                st.markdown(resume_content)
 
+            # 원본 마크다운도 확인할 수 있도록
+            with st.expander("📝 마크다운 원본 보기"):
+                st.text_area("", value=resume_content, height=300, disabled=True)
         # ✅ 간단한 로컬 파일 다운로드 처리
         docx_path = state.get("docx_path", "")
         if docx_path:
@@ -371,14 +441,24 @@ class ResumeAppUI:
                     st.error(f"파일 처리 중 오류가 발생했습니다: {str(e)}")
 
             else:
-                # 로컬 파일 처리 (개발)
-                actual_path = docx_path
-                if not os.path.exists(docx_path) and not os.path.isabs(docx_path):
-                    actual_path = os.path.abspath(docx_path)
+                # 📁 로컬 파일 처리 (개발환경)
+                from pathlib import Path
 
-                if os.path.exists(actual_path):
+                # 기본 프로젝트 루트 경로 기준으로 상대경로를 절대경로로 변환
+                project_root = (
+                    Path(__file__).resolve().parents[2]
+                )  # fastapi_project 루트
+                actual_path = project_root / docx_path
+
+                # 디버깅 정보 출력
+                with st.expander("🔍 경로 디버깅", expanded=False):
+                    st.text(f"문자열 경로: {docx_path}")
+                    st.text(f"실제 절대경로: {actual_path}")
+                    st.text(f"파일 존재 여부: {actual_path.exists()}")
+
+                if actual_path.exists():
                     try:
-                        # 파일명 생성
+                        # 안전한 파일명 생성
                         user_email = state.get("inputs", {}).get("email", "user")
                         safe_email = (
                             user_email.split("@")[0]
@@ -388,14 +468,12 @@ class ResumeAppUI:
                         filename = f"resume_{safe_email}.docx"
 
                         # 파일 읽기
-                        with open(actual_path, "rb") as file:
-                            file_data = file.read()
-
-                        # 파일 크기 정보
-                        file_size = len(file_data)
-                        st.success(f"✅ 파일 준비 완료! (크기: {file_size:,} bytes)")
+                        file_data = actual_path.read_bytes()
 
                         # 다운로드 버튼
+                        st.success(
+                            f"✅ 파일 준비 완료! (크기: {len(file_data):,} bytes)"
+                        )
                         st.download_button(
                             label="📥 이력서 다운로드 (DOCX)",
                             data=file_data,
@@ -404,49 +482,49 @@ class ResumeAppUI:
                             use_container_width=True,
                             key=f"download_local_{state.get('asked_count', 0)}",
                         )
-
-                        st.info(f"💡 다운로드 파일명: {filename}")
-
                     except Exception as e:
-                        logger.error(f"로컬 파일 읽기 오류: {e}")
-                        st.error(f"파일을 읽는 중 오류가 발생했습니다: {str(e)}")
+                        logger.error(f"[파일 열기 오류] {e}")
+                        st.error(f"파일을 여는 중 오류가 발생했습니다: {str(e)}")
 
                 else:
                     st.error("📁 파일을 찾을 수 없습니다!")
+                    st.warning(
+                        "🔧 가능한 원인:\n1. 파일 생성 실패\n2. 경로 계산 오류\n3. 권한 문제"
+                    )
 
-                    # 문제 해결 도움말
-                    st.warning("🔧 가능한 원인:")
-                    st.write("1. 파일 생성이 실패했을 수 있습니다")
-                    st.write("2. 파일 경로가 잘못되었을 수 있습니다")
-                    st.write("3. 파일 생성 권한 문제일 수 있습니다")
-
-                    # 다시 시도 버튼
                     if st.button("🔄 이력서 다시 생성"):
                         payload = deepcopy(state)
                         payload["inputs"] = self.ensure_inputs_dict(payload["inputs"])
                         payload["info_ready"] = True
-
-                        result = self.make_api_request("/resume/agent/update", payload)
+                        result = self.make_api_request(
+                            "/api/v1/resume/agent/update", payload
+                        )
                         if result:
                             result["inputs"] = self.ensure_inputs_dict(result["inputs"])
                             result["step"] = "completed"
                             st.session_state["state"] = result
                             st.rerun()
 
-        else:
-            st.warning("⚠️ 다운로드할 파일 경로가 설정되지 않았습니다.")
+                    else:
+                        st.warning("⚠️ 다운로드할 파일 경로가 설정되지 않았습니다.")
 
-            if st.button("🔄 이력서 생성 다시 시도"):
-                payload = deepcopy(state)
-                payload["inputs"] = self.ensure_inputs_dict(payload["inputs"])
-                payload["info_ready"] = True
+                        if st.button("🔄 이력서 생성 다시 시도"):
+                            payload = deepcopy(state)
+                            payload["inputs"] = self.ensure_inputs_dict(
+                                payload["inputs"]
+                            )
+                            payload["info_ready"] = True
 
-                result = self.make_api_request("/resume/agent/update", payload)
-                if result:
-                    result["inputs"] = self.ensure_inputs_dict(result["inputs"])
-                    result["step"] = "completed"
-                    st.session_state["state"] = result
-                    st.rerun()
+                            result = self.make_api_request(
+                                "/api/v1/resume/agent/update", payload
+                            )
+                            if result:
+                                result["inputs"] = self.ensure_inputs_dict(
+                                    result["inputs"]
+                                )
+                                result["step"] = "completed"
+                                st.session_state["state"] = result
+                                st.rerun()
 
         # 다시 시작 버튼
         if st.button("🔄 새 이력서 만들기", use_container_width=True):
@@ -485,8 +563,14 @@ class ResumeAppUI:
         if os.getenv("DEBUG", "false").lower() == "true":
             with st.sidebar:
                 st.subheader("🔧 디버그 정보")
-                st.json({"step": step, "asked_count": state.get("asked_count", 0)})
-
+                st.json(
+                    {
+                        "step": step,
+                        "asked_count": state.get("asked_count", 0),
+                        "docx_path": state.get("docx_path", ""),  # 추가
+                        "info_ready": state.get("info_ready", False),  # 추가
+                    }
+                )
         # 단계별 렌더링
         try:
             if step == "init":
