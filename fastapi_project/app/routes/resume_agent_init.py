@@ -83,9 +83,11 @@ async def initialize_resume_agent(payload: ResumeAgentInitRequest):
         save_success = await redis_client.save_state(memberId, initial_state)
         if not save_success:
             logger.error(f"상태 저장 실패: memberId={memberId}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="상태 저장에 실패했습니다.",
+            return JSONResponse(
+                status_code=500,
+                content=create_error_response(
+                    message="상태 저장에 실패했습니다.", status_code=500
+                ),
             )
 
         # 6. 새로운 형식 응답 반환
@@ -104,11 +106,12 @@ async def initialize_resume_agent(payload: ResumeAgentInitRequest):
         logger.error(f"초기화 중 오류 발생: memberId={memberId}, error={str(e)}")
         logger.error(traceback.format_exc())
 
-        # 에러 응답 반환
-        error_response = create_error_response(
-            message=f"이력서 에이전트 초기화 실패: {str(e)}", status_code=500
+        return JSONResponse(
+            status_code=500,
+            content=create_error_response(
+                message=f"이력서 에이전트 초기화 실패: {str(e)}", status_code=500
+            ),
         )
-        raise HTTPException(status_code=500, detail=error_response)
 
 
 async def _generate_first_question(state) -> str:

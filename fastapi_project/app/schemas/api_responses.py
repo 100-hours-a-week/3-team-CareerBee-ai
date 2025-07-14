@@ -1,11 +1,11 @@
 # app/schemas/api_responses.py
-
 """
 API 응답 전용 모델들 (Spring과의 통신용)
 """
 from pydantic import BaseModel, Field
-from typing import Optional, Union, Dict, Any
+from typing import Optional, Dict, Any
 from datetime import datetime
+
 
 # ================================
 # 1. 이력서 에이전트 응답 모델들
@@ -64,14 +64,6 @@ class ResumeAgentUpdateResponse(BaseModel):
 # ================================
 
 
-class ResumeCreateResponse(BaseModel):
-    """기본 이력서 생성 응답 (기존 Spring 호환 형식)"""
-
-    httpStatusCode: int = Field(default=200, description="HTTP 상태 코드")
-    message: str = Field(..., description="응답 메시지")
-    data: "ResumeCreateData" = Field(..., description="응답 데이터")
-
-
 class ResumeCreateData(BaseModel):
     """기본 이력서 생성 응답 데이터"""
 
@@ -81,6 +73,14 @@ class ResumeCreateData(BaseModel):
 
     class Config:
         json_encoders = {datetime: lambda v: v.isoformat()}
+
+
+class ResumeCreateResponse(BaseModel):
+    """기본 이력서 생성 응답 (기존 Spring 호환 형식)"""
+
+    httpStatusCode: int = Field(default=200, description="HTTP 상태 코드")
+    message: str = Field(..., description="응답 메시지")
+    data: ResumeCreateData = Field(..., description="응답 데이터")
 
 
 # ================================
@@ -144,17 +144,8 @@ class AgentStatusResponse(BaseModel):
     pending_questions: int = Field(..., description="대기 질문 수")
     answers_count: int = Field(..., description="답변 수")
     created_at: str = Field(..., description="생성 시간")
-    updated_at: str = Field(
-        ..., description="수정 시간"
-    )  # app/schemas/api_responses.py
+    updated_at: str = Field(..., description="수정 시간")
 
-
-"""
-API 응답 전용 모델들 (Spring과의 통신용)
-"""
-from pydantic import BaseModel, Field
-from typing import Optional, Union, Dict, Any
-from datetime import datetime
 
 # ================================
 # 6. 응답 생성 헬퍼 함수들
@@ -168,24 +159,42 @@ def create_agent_init_response(memberId: int, question: str) -> ResumeAgentInitR
 
 def create_agent_update_response(
     memberId: int,
-    isComplete: bool,
+    is_complete: bool,
     question: Optional[str] = None,
-    resumeObjectKey: Optional[str] = None,
+    resume_object_key: Optional[str] = None,
 ) -> ResumeAgentUpdateResponse:
     """에이전트 업데이트 응답 생성"""
     return ResumeAgentUpdateResponse(
         memberId=memberId,
-        isComplete=isComplete,
+        isComplete=is_complete,
         question=question,
-        resumeObjectKey=resumeObjectKey,
+        resumeObjectKey=resume_object_key,
     )
 
 
 def create_error_response(
-    message: str, status_code: int, details: Optional[Dict[str, Any]] = None
-) -> ErrorResponse:
-    """에러 응답 생성"""
-    return ErrorResponse(message=message, status_code=status_code, details=details)
+    message: str,
+    status_code: int = 500,
+    detail: Optional[str] = None,
+    data: Optional[Any] = None,
+) -> dict:
+    """에러 응답 생성
+
+    Args:
+        message (str): 사용자에게 표시할 메시지
+        status_code (int): HTTP 상태 코드
+        detail (str): 내부 디버깅용 상세 설명
+        data (Any): 추가 정보 전달용 (선택)
+
+    Returns:
+        dict: 일관된 에러 응답 JSON
+    """
+    return {
+        "httpStatusCode": status_code,
+        "message": message,
+        "detail": detail,
+        "data": data,
+    }
 
 
 def create_resume_create_response(
@@ -193,9 +202,12 @@ def create_resume_create_response(
 ) -> ResumeCreateResponse:
     """이력서 생성 응답 생성"""
     return ResumeCreateResponse(
+        httpStatusCode=200,
         message=message,
         data=ResumeCreateData(
-            resume_url=resume_url, filename=filename, created_at=datetime.now()
+            resumeUrl=resume_url,
+            filename=filename,
+            createdAt=datetime.now(),
         ),
     )
 
@@ -223,7 +235,3 @@ def create_agent_status_response(
         created_at=created_at,
         updated_at=updated_at,
     )
-
-
-# Forward reference 해결
-ResumeCreateResponse.model_rebuild()

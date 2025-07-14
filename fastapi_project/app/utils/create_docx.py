@@ -15,8 +15,8 @@ def save_resume_to_docx(resume_text: str, save_dir: str = "generated_resumes") -
     os.makedirs("./generated_resumes", exist_ok=True)
 
     # 파일 이름 설정
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"resume_{timestamp}.docx"
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    filename = f"resume{timestamp}.docx"
     doc.save(filename)
 
     return filename

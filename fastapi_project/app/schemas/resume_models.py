@@ -3,7 +3,7 @@
 이력서 관련 모든 모델 통합 - Redis 통합 및 새로운 API 요구사항 반영
 """
 from pydantic import BaseModel, Field
-from typing import Dict, List, Optional, Literal, Union
+from typing import Dict, List, Optional, Literal
 from datetime import datetime
 
 from .base import BaseInputsModel, BaseTimestampModel, QuestionAnswerPair, RedisMixin
@@ -414,75 +414,6 @@ def update_state_with_answer(
     """상태에 답변 추가 헬퍼 함수"""
     state.add_answer(question, answer)
     return state
-
-
-# ================================
-# 8. 응답 생성 헬퍼 함수들
-# ================================
-
-
-def create_agent_init_response(memberId: int, question: str) -> dict:
-    """에이전트 초기화 응답 생성"""
-    return {"memberId": memberId, "question": question}
-
-
-def create_agent_update_response(
-    memberId: int,
-    is_complete: bool,
-    question: Optional[str] = None,
-    resume_object_key: Optional[str] = None,
-) -> dict:
-    """에이전트 업데이트 응답 생성"""
-    return {
-        "memberId": memberId,
-        "isComplete": is_complete,
-        "question": question,
-        "resumeObjectKey": resume_object_key,
-    }
-
-
-def create_error_response(
-    message: str, status_code: int, details: Optional[Dict] = None
-) -> ErrorResponse:
-    """에러 응답 생성"""
-    return ErrorResponse(message=message, status_code=status_code, details=details)
-
-
-def create_resume_create_response(
-    resume_url: str, filename: str, message: str = "이력서 초안 생성에 성공하였습니다."
-) -> ResumeCreateResponse:
-    """이력서 생성 응답 생성"""
-    return ResumeCreateResponse(
-        message=message,
-        data=ResumeCreateData(
-            resumeUrl=resume_url, filename=filename, createdAt=datetime.now()
-        ),
-    )
-
-
-def create_agent_status_response(
-    memberId: int,
-    step: str,
-    asked_count: int,
-    max_questions: int,
-    info_ready: bool,
-    pending_questions_count: int,
-    answers_count: int,
-    created_at: str,
-    updated_at: str,
-) -> AgentStatusResponse:
-    """에이전트 상태 조회 응답 생성"""
-    return AgentStatusResponse(
-        memberId=memberId,
-        step=step,
-        asked_count=asked_count,
-        max_questions=max_questions,
-        info_ready=info_ready,
-        pending_questions=pending_questions_count,
-        answers_count=answers_count,
-        created_at=created_at,
-        updated_at=updated_at,
-    )
 
 
 # Forward reference 해결

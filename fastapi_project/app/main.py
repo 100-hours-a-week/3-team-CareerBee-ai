@@ -4,10 +4,11 @@ import sys
 import traceback
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
@@ -19,6 +20,12 @@ from app.routes.feedback import router as feedback_router
 from app.routes.summary import router as summary_router
 from app.routes.resume_agent_init import router as agent_init_router
 from app.routes.resume_agent_update import router as agent_update_router
+
+from app.handlers.exception_handlers import (
+    http_exception_handler,
+    validation_exception_handler,
+    unhandled_exception_handler,
+)
 
 from app.utils.redis_client import get_redis_client
 from app.schemas import HealthCheckResponse
@@ -99,58 +106,58 @@ app.add_middleware(
 )
 
 
-# ✅ HTTP 예외 핸들러
-@app.exception_handler(StarletteHTTPException)
-async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    logger.warning(
-        f"HTTP Exception: {exc.status_code} - {exc.detail} - "
-        f"Path: {request.url.path} - Client: {request.client.host if request.client else 'unknown'}"
-    )
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "httpStatusCode": exc.status_code,
-            "message": "HTTP 예외 발생",
-            "detail": exc.detail,
-        },
-    )
+# # ✅ HTTP 예외 핸들러
+# @app.exception_handler(StarletteHTTPException)
+# async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+#     logger.warning(
+#         f"HTTP Exception: {exc.status_code} - {exc.detail} - "
+#         f"Path: {request.url.path} - Client: {request.client.host if request.client else 'unknown'}"
+#     )
+#     return JSONResponse(
+#         status_code=exc.status_code,
+#         content={
+#             "httpStatusCode": exc.status_code,
+#             "message": "HTTP 예외 발생",
+#             "detail": exc.detail,
+#         },
+#     )
 
 
-# ✅ 요청 유효성 검증 실패 (422) 핸들러
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    body = await request.body()
-    logging.warning("❌ 422 요청 데이터 검증 실패")
-    logging.warning(f"📦 요청 바디: {body.decode('utf-8')}")
-    logging.warning(f"🔍 에러 상세: {exc.errors()}")
+# # ✅ 요청 유효성 검증 실패 (422) 핸들러
+# @app.exception_handler(RequestValidationError)
+# async def validation_exception_handler(request: Request, exc: RequestValidationError):
+#     body = await request.body()
+#     logging.warning("❌ 422 요청 데이터 검증 실패")
+#     logging.warning(f"📦 요청 바디: {body.decode('utf-8')}")
+#     logging.warning(f"🔍 에러 상세: {exc.errors()}")
 
-    return JSONResponse(
-        status_code=422,
-        content={
-            "httpStatusCode": 422,
-            "message": "요청 데이터 검증 실패",
-            "detail": exc.errors(),
-        },
-    )
+#     return JSONResponse(
+#         status_code=422,
+#         content={
+#             "httpStatusCode": 422,
+#             "message": "요청 데이터 검증 실패",
+#             "detail": exc.errors(),
+#         },
+#     )
 
 
-# ✅ 기타 예외 핸들러
-@app.exception_handler(Exception)
-async def generic_exception_handler(request: Request, exc: Exception):
-    logger.error(
-        f"Unhandled Exception: {type(exc).__name__} - {str(exc)} - "
-        f"Path: {request.url.path} - Client: {request.client.host if request.client else 'unknown'}",
-        exc_info=True,
-    )
-    traceback.print_exc()
-    return JSONResponse(
-        status_code=500,
-        content={
-            "httpStatusCode": 500,
-            "message": "내부 서버 오류입니다.",
-            "detail": str(exc),
-        },
-    )
+# # ✅ 기타 예외 핸들러
+# @app.exception_handler(Exception)
+# async def generic_exception_handler(request: Request, exc: Exception):
+#     logger.error(
+#         f"Unhandled Exception: {type(exc).__name__} - {str(exc)} - "
+#         f"Path: {request.url.path} - Client: {request.client.host if request.client else 'unknown'}",
+#         exc_info=True,
+#     )
+#     traceback.print_exc()
+#     return JSONResponse(
+#         status_code=500,
+#         content={
+#             "httpStatusCode": 500,
+#             "message": "내부 서버 오류입니다.",
+#             "detail": str(exc),
+#         },
+#     )
 
 
 # 라우터 등록
@@ -161,6 +168,11 @@ app.include_router(health_router, tags=["Health"])
 app.include_router(feedback_router, tags=["Feedback"])
 app.include_router(summary_router, tags=["Summary"])
 app.include_router(agent_update_router, prefix="/api/v1", tags=["Resume Agent"])
+
+# 공통 핸들러 등록
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(Exception, unhandled_exception_handler)
 
 
 # ✅ 기본 헬스 체크
