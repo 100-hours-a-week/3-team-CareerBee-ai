@@ -85,4 +85,4 @@ async def generate_feedback(question: str, answer: str) -> str:
                 return result["choices"][0]["message"]["content"].strip()
 
     except aiohttp.ClientError as e:
-        return f"피드백 생성 중 오류 발생: {str(e)}"
+        raise RuntimeError(f"LLM API 요청 실패: {str(e)}")

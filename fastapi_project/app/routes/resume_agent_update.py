@@ -307,8 +307,10 @@ async def update_resume_agent(payload: ResumeAgentUpdateRequest):
         )
         logger.error(traceback.format_exc())
 
-        # 에러 응답 반환
-        error_response = create_error_response(
-            message=f"이력서 에이전트 업데이트 실패: {str(e)}", status_code=500
+        return JSONResponse(
+            status_code=500,
+            content=create_error_response(
+                message=f"이력서 에이전트 업데이트 실패: {str(e)}",
+                status_code=500,
+            ),
         )
-        raise HTTPException(status_code=500, detail=error_response.dict())

@@ -35,50 +35,33 @@ async def generate_resume_by_agent(request: ResumeCreateRequest):
     3. S3 업로드
     4. 기존 형식 응답 반환 (Spring 호환성)
     """
-    try:
-        logger.info("기본 이력서 생성 요청 들어옴")
-        logger.info(f"요청 데이터: {jsonable_encoder(request)}")
 
-        # 1. 입력 데이터 검증
-        _validate_request(request)
+    logger.info("기본 이력서 생성 요청 들어옴")
+    logger.info(f"요청 데이터: {jsonable_encoder(request)}")
 
-        # 2. 이력서 문서 생성
-        file_obj = await _generate_resume_document(request)
+    # 1. 입력 데이터 검증
+    _validate_request(request)
 
-        # 3. 파일명 생성
-        filename = _generate_filename()
+    # 2. 이력서 문서 생성
+    file_obj = await _generate_resume_document(request)
 
-        # 4. S3 업로드
-        file_url = await _upload_to_s3(file_obj, filename)
+    # 3. 파일명 생성
+    filename = _generate_filename()
 
-        # 5. 성공 응답 생성 (기존 형식 유지)
-        # datetime 직렬화 문제 해결을 위해 수동으로 응답 구성
-        response = create_resume_create_response(
-            resume_url=file_url,
-            filename=filename,
-            message="이력서 초안 생성에 성공하였습니다.",
-        )
+    # 4. S3 업로드
+    file_url = await _upload_to_s3(file_obj, filename)
 
-        logger.info(f"✅ 이력서 생성 및 업로드 완료: {file_url}")
+    # 5. 성공 응답 생성 (기존 형식 유지)
+    # datetime 직렬화 문제 해결을 위해 수동으로 응답 구성
+    response = create_resume_create_response(
+        resume_url=file_url,
+        filename=filename,
+        message="이력서 초안 생성에 성공하였습니다.",
+    )
 
-        return JSONResponse(content=response.dict())
+    logger.info(f"✅ 이력서 생성 및 업로드 완료: {file_url}")
 
-    except HTTPException:
-        # HTTPException은 그대로 re-raise
-        raise
-
-    except Exception as e:
-        logger.error(f"예상치 못한 오류 발생: {str(e)}")
-        logger.error(traceback.format_exc())
-
-        # 단순한 에러 응답 (JSON 직렬화 문제 방지)
-        error_response = {
-            "httpStatusCode": 500,
-            "message": "이력서 생성 중 오류가 발생했습니다.",
-            "detail": str(e),
-        }
-
-        raise HTTPException(status_code=500, detail=error_response)
+    return JSONResponse(content=response.dict())
 
 
 def _validate_request(request: ResumeCreateRequest) -> None:

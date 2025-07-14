@@ -1,0 +1,24 @@
+# requirements-test.txt
+# 핵심 테스트 프레임워크
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+
+# HTTP 클라이언트
+httpx>=0.24.0
+
+# 환경 변수 관리
+pytest-env>=0.8.0
+
+# 외부 서비스 모킹
+fakeredis>=2.18.0
+moto>=4.2.0
+
+# 병렬 테스트
+pytest-xdist>=3.3.0
+
+# 추가 유틸리티
+pytest-html>=3.2.0  # HTML 리포트
+pytest-json-report>=1.5.0  # JSON 리포트
+pytest-timeout>=2.1.0  # 타임아웃 설정
