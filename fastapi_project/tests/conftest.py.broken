@@ -1,0 +1,75 @@
+import pytest
+import asyncio
+import os
+import json
+from unittest.mock import AsyncMock, Mock, patch
+from pathlib import Path
+from datetime import datetime
+from io import BytesIO
+
+from fastapi.testclient import TestClient
+from httpx import AsyncClient
+from fastapi import UploadFile
+
+# 환경변수 안전하게 설정 (None 값 방지)
+os.environ.update({
+    "REDIS_URL": os.getenv("REDIS_URL") or "redis://localhost:6379",
+    "AWS_ACCESS_KEY_ID": os.getenv("AWS_ACCESS_KEY_ID") or "test_access_key", 
+    "AWS_SECRET_ACCESS_KEY": os.getenv("AWS_SECRET_ACCESS_KEY") or "test_secret_key",
+    "AWS_DEFAULT_REGION": os.getenv("AWS_DEFAULT_REGION") or "ap-northeast-2",
+    "S3_BUCKET_NAME": os.getenv("S3_BUCKET_NAME") or "test-bucket",
+    "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY") or "test_openai_key",
+})
+
+# 간단한 mock으로 DB 문제 우회
+with patch('app.utils.summarizer_core.Chroma'):
+    try:
+        from app.main import app
+    except Exception as e:
+        print(f"Warning: Could not import app: {e}")
+        app = None
+
+@pytest.fixture(scope="session")
+def event_loop():
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
+
+@pytest.fixture
+def client():
+    if app:
+        return TestClient(app)
+    return None
+
+@pytest.fixture
+async def async_client():
+    if app:
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+            yield ac
+    else:
+        yield None
+
+@pytest.fixture
+def sample_feedback_request():
+    return {
+        "memberId": 1,
+        "question": "자기소개를 해보세요.",
+        "answer": "안녕하세요. 저는 개발자입니다."
+    }
+
+@pytest.fixture
+def sample_agent_init_request():
+    return {
+        "memberId": 1,
+        "inputs": {
+            "email": "test@example.com",
+            "preferred_job": "백엔드 개발자",
+            "certification_count": 2,
+            "project_count": 3,
+            "major_type": "MAJOR",
+            "company_name": "회사",
+            "position": "개발자", 
+            "work_period": 12,
+            "additional_experiences": "경험"
+        }
+    }
