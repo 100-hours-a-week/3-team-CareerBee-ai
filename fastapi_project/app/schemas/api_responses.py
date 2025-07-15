@@ -159,14 +159,14 @@ def create_agent_init_response(memberId: int, question: str) -> ResumeAgentInitR
 
 def create_agent_update_response(
     memberId: int,
-    is_complete: bool,
+    isComplete: bool,
     question: Optional[str] = None,
     resume_object_key: Optional[str] = None,
 ) -> ResumeAgentUpdateResponse:
     """에이전트 업데이트 응답 생성"""
     return ResumeAgentUpdateResponse(
         memberId=memberId,
-        isComplete=is_complete,
+        isComplete=isComplete,
         question=question,
         resumeObjectKey=resume_object_key,
     )

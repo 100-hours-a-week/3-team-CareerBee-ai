@@ -1,0 +1,68 @@
+# tests/test_documents/sample_inputs.txt
+# 테스트용 입력 데이터 파일 - 실제 스키마 검증용
+
+=== 유효한 BaseInputsModel 데이터 예시 ===
+
+기본 개발자 프로필:
+email: developer@example.com
+preferred_job: 백엔드 개발자
+certification_count: 3
+project_count: 5
+major_type: MAJOR
+company_name: 테크 스타트업
+position: 주니어 개발자
+work_period: 24
+additional_experiences: Python, FastAPI, PostgreSQL 경험
+
+시니어 개발자 프로필:
+email: senior.dev@company.com
+preferred_job: 시니어 풀스택 개발자
+certification_count: 7
+project_count: 12
+major_type: MAJOR
+company_name: 대기업
+position: 팀장
+work_period: 60
+additional_experiences: 팀 리딩, 아키텍처 설계, DevOps 구축 경험
+
+비전공자 프로필:
+email: career.change@example.com
+preferred_job: 프론트엔드 개발자
+certification_count: 1
+project_count: 3
+major_type: NON_MAJOR
+company_name: 
+position: 
+work_period: 0
+additional_experiences: 부트캠프 수료, React 개인 프로젝트
+
+=== 피드백 요청 예시 ===
+
+기술 질문:
+memberId: 1
+question: 가장 자신있는 프로그래밍 언어는 무엇인가요?
+answer: Python을 가장 자신있게 다룹니다. Django와 FastAPI 프레임워크 경험이 있고, 3년간 웹 서비스 백엔드를 개발했습니다.
+
+프로젝트 질문:
+memberId: 2
+question: 가장 어려웠던 프로젝트와 해결 과정을 설명해주세요.
+answer: 실시간 채팅 서비스 개발 시 동시 접속자 처리가 어려웠습니다. WebSocket과 Redis Pub/Sub을 활용하여 확장 가능한 아키텍처를 구축했습니다.
+
+=== 에러 케이스 예시 ===
+
+잘못된 이메일:
+email: invalid-email
+preferred_job: 개발자
+major_type: MAJOR
+
+음수 값:
+email: test@example.com
+preferred_job: 개발자
+certification_count: -1
+project_count: -3
+major_type: MAJOR
+
+잘못된 major_type:
+email: test@example.com
+preferred_job: 개발자
+major_type: INVALID_TYPE
