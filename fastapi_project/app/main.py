@@ -35,6 +35,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from pytz import timezone
 from dotenv import load_dotenv
 
+from prometheus_fastapi_instrumentator import Instrumentator
+
 # ✅ 전역 로깅 설
 logging.basicConfig(
     level=logging.INFO,
@@ -90,11 +92,12 @@ async def lifespan(app: FastAPI):
 
 # FastAPI 앱 생성 (lifespan 추가)
 app = FastAPI(
-    title="Resume Agent API",
+    title="FastAPI",
     version="1.0.0",
-    description="LangGraph 기반 이력서 생성 에이전트 API + 기타 서비스",
+    description="CareerBee AI 기능",
     lifespan=lifespan,
 )
+Instrumentator().instrument(app).expose(app)
 
 # CORS 미들웨어
 app.add_middleware(
