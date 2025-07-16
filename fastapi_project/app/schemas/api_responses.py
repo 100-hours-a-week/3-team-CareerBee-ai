@@ -65,21 +65,12 @@ class ResumeAgentUpdateResponse(BaseModel):
 
 
 class ResumeCreateData(BaseModel):
-    """기본 이력서 생성 응답 데이터"""
-
-    resumeUrl: str = Field(..., description="이력서 다운로드 URL")
-    filename: str = Field(..., description="파일명")
-    createdAt: datetime = Field(..., description="생성 시간")
-
-    class Config:
-        json_encoders = {datetime: lambda v: v.isoformat()}
+    file_url: str = Field(..., description="이력서 다운로드 URL")
+    file_name: str = Field(..., description="파일명")
 
 
 class ResumeCreateResponse(BaseModel):
-    """기본 이력서 생성 응답 (기존 Spring 호환 형식)"""
-
-    httpStatusCode: int = Field(default=200, description="HTTP 상태 코드")
-    message: str = Field(..., description="응답 메시지")
+    message: str = Field(..., description="resume_draft_success")  # e.g.
     data: ResumeCreateData = Field(..., description="응답 데이터")
 
 
@@ -198,16 +189,14 @@ def create_error_response(
 
 
 def create_resume_create_response(
-    resume_url: str, filename: str, message: str = "이력서 초안 생성에 성공하였습니다."
+    resume_url: str, filename: str
 ) -> ResumeCreateResponse:
     """이력서 생성 응답 생성"""
     return ResumeCreateResponse(
-        httpStatusCode=200,
-        message=message,
+        message="resume_draft_success",
         data=ResumeCreateData(
-            resumeUrl=resume_url,
-            filename=filename,
-            createdAt=datetime.now(),
+            file_url=resume_url,
+            file_name=filename,
         ),
     )
 
@@ -234,4 +223,37 @@ def create_agent_status_response(
         answers_count=answers_count,
         created_at=created_at,
         updated_at=updated_at,
+    )
+
+
+# ================================
+# 7. 기본 이력서 에러 응답 모델
+# ================================
+
+
+class ErrorData(BaseModel):
+    error: str = Field(..., description="에러 유형 코드")
+    details: str = Field(..., description="에러 상세 설명")
+
+
+class ErrorResponseV2(BaseModel):
+    message: str = Field(..., description="에러 메시지 코드")
+    data: ErrorData = Field(..., description="에러 상세 데이터")
+
+
+# 에러 응답 생성 헬퍼 함수 추가
+
+
+def create_error_response_v2(
+    message: str,
+    error_code: str,
+    details: str,
+) -> ErrorResponseV2:
+    """명세 기반 에러 응답 생성"""
+    return ErrorResponseV2(
+        message=message,
+        data=ErrorData(
+            error=error_code,
+            details=details,
+        ),
     )
