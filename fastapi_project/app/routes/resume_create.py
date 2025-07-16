@@ -7,8 +7,11 @@ import asyncio
 import traceback
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, status
-from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
+from app.schemas.api_responses import create_error_response_v2
+from typing import Optional
+import json
 
 # 새로운 통합 스키마 사용
 from app.schemas import (
@@ -40,50 +43,66 @@ async def generate_resume_by_agent(request: ResumeCreateRequest):
     logger.info(f"요청 데이터: {jsonable_encoder(request)}")
 
     # 1. 입력 데이터 검증
-    _validate_request(request)
+    validation_error_response = _validate_request(request)
+    if validation_error_response:
+        return validation_error_response
 
-    # 2. 이력서 문서 생성
-    file_obj = await _generate_resume_document(request)
+    try:
+        # 2. 이력서 문서 생성
+        file_obj = await _generate_resume_document(request)
 
-    # 3. 파일명 생성
-    filename = _generate_filename()
+        # 3. 파일명 생성
+        filename = _generate_filename()
 
-    # 4. S3 업로드
-    file_url = await _upload_to_s3(file_obj, filename)
+        # 4. S3 업로드
+        file_url = await _upload_to_s3(file_obj, filename)
 
-    # 5. 성공 응답 생성 (기존 형식 유지)
-    # datetime 직렬화 문제 해결을 위해 수동으로 응답 구성
-    response = create_resume_create_response(
-        resume_url=file_url,
-        filename=filename,
-        message="이력서 초안 생성에 성공하였습니다.",
-    )
-
-    logger.info(f"✅ 이력서 생성 및 업로드 완료: {file_url}")
-
-    return JSONResponse(content=response.dict())
-
-
-def _validate_request(request: ResumeCreateRequest) -> None:
-    """요청 데이터 검증"""
-    if not request:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="요청 데이터가 없습니다.",
+        # 5. 성공 응답 생성 (기존 형식 유지)
+        response = create_resume_create_response(
+            resume_url=file_url,
+            filename=filename,
         )
 
-    # 필수 필드 검증 (통합 스키마의 validation 활용)
+        logger.info(f"✅ 이력서 생성 및 업로드 완료: {file_url}")
+
+        return response
+
+    except HTTPException as e:
+        # HTTPException의 detail이 JSON 문자열인 경우 파싱
+        if isinstance(e.detail, str):
+            try:
+                error_data = json.loads(e.detail)
+                return JSONResponse(status_code=e.status_code, content=error_data)
+            except json.JSONDecodeError:
+                pass
+        raise
+
+
+def _validate_request(request: ResumeCreateRequest) -> Optional[JSONResponse]:
+    # FastAPI가 자동으로 request validation을 하므로 이 체크는 불필요
+    # if not request는 제거
+
     if not request.email or "@" not in request.email:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="유효한 이메일 주소를 입력해주세요.",
+        return JSONResponse(
+            status_code=400,
+            content=create_error_response_v2(
+                message="invalid_request",
+                error_code="invalid_email",
+                details="유효한 이메일 주소를 입력해주세요.",
+            ).model_dump(),  # .dict() 대신 .model_dump() 사용
         )
 
-    if not request.preferred_job.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="희망 직무를 입력해주세요.",
+    if not request.preferred_job or not request.preferred_job.strip():
+        return JSONResponse(
+            status_code=400,
+            content=create_error_response_v2(
+                message="invalid_request",
+                error_code="missing_required_fields",
+                details="preferred_job 필드가 누락되었습니다.",
+            ).model_dump(),  # .dict() 대신 .model_dump() 사용
         )
+
+    return None
 
 
 async def _generate_resume_document(request: ResumeCreateRequest) -> bytes:
@@ -107,9 +126,17 @@ async def _generate_resume_document(request: ResumeCreateRequest) -> bytes:
     except Exception as e:
         logger.error(f"이력서 문서 생성 중 오류: {str(e)}")
         logger.error(traceback.format_exc())
+
+        # JSONResponse를 반환하는 대신 HTTPException을 발생시킴
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"이력서 문서 생성 실패: {str(e)}",
+            detail=json.dumps(
+                create_error_response_v2(
+                    message="internal_server_error",
+                    error_code="unexpected_exception",
+                    details="An unexpected error occurred while generating the resume draft.",
+                ).model_dump()  # .dict() 대신 .model_dump() 사용
+            ),
         )
 
 
