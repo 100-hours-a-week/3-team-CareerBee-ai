@@ -4,7 +4,8 @@
 """
 import traceback
 import logging
-from fastapi import APIRouter, HTTPException, status
+
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
 from app.schemas import (
