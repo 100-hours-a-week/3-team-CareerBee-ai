@@ -1,11 +1,22 @@
 import os
-import requests
-import time
 import aiohttp
-import asyncio
+import re
+from transformers import pipeline
 
 VLLM_URL = os.getenv("VLLM_URL", "http://localhost:8001")
 MODEL_NAME = "/mnt/ssd/aya-expanse-8b"
+
+classifier = pipeline(
+    "text-classification", model="beomi/KcELECTRA-base-toxic-comments"
+)
+
+
+def is_safe_with_model(text: str) -> bool:
+    predictions = classifier(text)
+    for pred in predictions:
+        if pred["label"] == "toxicity" and pred["score"] > 0.8:
+            return False
+    return True
 
 
 def build_feedback_prompt(question: str, answer: str) -> str:
@@ -13,7 +24,9 @@ def build_feedback_prompt(question: str, answer: str) -> str:
     user_prompt = (
         f"[질문]\n{question}\n"
         f"[답변]\n{answer}\n"
-        "**다음 기준에 따라 문체는 간결하게, 문장 도중에 끊기지 않도록 의미 단위로 마무리해 주세요. 전체 피드백은 한글 기준 띄어쓰기 포함 450자 이내여야 하며, 다음 형식을 참고해 주세요: \n\n"
+        "**다음 기준에 따라 문체는 간결하게, 문장 도중에 끊기지 않도록 의미 단위로 마무리해 주세요.**\n"
+        "답변은 항상 정중하고 전문적인 언어를 사용해야 하며, 비하, 모욕, 차별적 표현은 절대 포함하지 마세요.\n"
+        "전체 피드백은 한글 기준 띄어쓰기 포함 450자 이내여야 하며, 다음 형식을 참고해 주세요: \n\n"
         "프록시 서버의 개념을 이해하고 있으나 몇 가지 핵심 설명이 빠져 있습니다.\n"
         "**긍정적인 점:**\n- 중개자 역할을 인지하고 있음\n"
         "**보완할 점:**\n- 보안 외의 주요 기능 예시 부족, 구체적인 사용 사례 추가 필요\n\n"
@@ -24,7 +37,6 @@ def build_feedback_prompt(question: str, answer: str) -> str:
     return f"{user_prompt}"
 
 
-# async + aiohttp 로 비동기 방식 전환
 async def generate_feedback(question: str, answer: str) -> str:
     prompt = build_feedback_prompt(question, answer)
 
@@ -51,7 +63,10 @@ async def generate_feedback(question: str, answer: str) -> str:
             ) as response:
                 response.raise_for_status()
                 result = await response.json()
-                return result["choices"][0]["message"]["content"].strip()
+                repsonse_text = result["choices"][0]["message"]["content"].strip()
+                if not is_safe_with_model(repsonse_text):
+                    raise ValueError("안전하지 않은 응답이 감지되었습니다.")
+                return repsonse_text
 
     except aiohttp.ClientError as e:
         raise RuntimeError(f"LLM API 요청 실패: {str(e)}")
