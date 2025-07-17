@@ -30,15 +30,13 @@ LLM을 기반으로 다음과 같은 기능을 제공합니다:
 
 ## 🧠 LLM (Large Language Model)
 
-- `CohereForAI/aya-8b`  
-  또는  
 - `CohereLabs/aya-expanse-8b`  
   (LoRA 기반 튜닝 가능)
 
 ---
 
 ## 📂 Project Directory Structure
-
+```
 3-TEAM-CAREERBEE-AI/
 ├── fastapi_project/
 │   ├── app/
@@ -48,7 +46,7 @@ LLM을 기반으로 다음과 같은 기능을 제공합니다:
 │   │   ├── schemas/         # Pydantic 데이터 모델
 │   │   └── utils/           # 보조 함수
 │   └── main.py              # FastAPI 앱 진입점
-
+```
 ---
 
 ## 🚀 How to Run
