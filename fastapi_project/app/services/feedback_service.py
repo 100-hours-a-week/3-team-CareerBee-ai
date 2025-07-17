@@ -1,6 +1,8 @@
 import os
 import requests
 import time
+import aiohttp
+import asyncio
 
 VLLM_URL = os.getenv("VLLM_URL", "http://localhost:8001")
 MODEL_NAME = "/mnt/ssd/aya-expanse-8b"
@@ -41,7 +43,10 @@ def build_feedback_prompt(question: str, answer: str) -> str:
     user_prompt = (
         f"[질문]\n{question}\n"
         f"[답변]\n{answer}\n"
+
         "**이 답변에 대해 다음 기준을 바탕으로 피드백을 한글 기준 250자 이내로 작성해주세요:**\n"
+
+
         "- 답변이 질문의 핵심을 이해하고 있는지\n"
         "- 틀린 내용이나 부족한 설명이 있는지\n"
         "- 어떤 내용을 보완하면 더 좋은 답변이 되는지\n"
@@ -52,38 +57,35 @@ def build_feedback_prompt(question: str, answer: str) -> str:
     return f"{few_shot_prompt}" f"{user_prompt}"
 
 
-def generate_feedback(question: str, answer: str) -> str:
+# async + aiohttp 로 비동기 방식 전환
+async def generate_feedback(question: str, answer: str) -> str:
     prompt = build_feedback_prompt(question, answer)
 
     try:
         print("VLLM_URL:", VLLM_URL)
-        start_time = time.time()
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=30)
+        ) as session:
+            async with session.post(
+                url=f"{VLLM_URL}/v1/chat/completions",
+                json={
+                    "model": MODEL_NAME,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "당신은 컴퓨터공학 면접관입니다. 당신이 질문한 컴퓨터공학 개념에 대해 지원자의 답변을 보고 어떤 점이 보완되면 좋겠는지 친절하게 피드백해주세요.",
+                            # "아래는 예시 질문과 답변, 그리고 그에 대한 피드백입니다."
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    "max_tokens": 512,
+                    "temperature": 0.7,
+                },
+                headers={"Content-Type": "application/json"},
+            ) as response:
+                response.raise_for_status()
+                result = await response.json()
+                return result["choices"][0]["message"]["content"].strip()
 
-        response = requests.post(
-            f"{VLLM_URL}/v1/chat/completions",
-            headers={"Content-Type": "application/json"},
-            json={
-                "model": MODEL_NAME,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "당신은 컴퓨터공학 면접관입니다. 당신이 질문한 컴퓨터공학 개념에 대해 지원자의 답변을 보고 어떤 점이 보완되면 좋겠는지 친절하게 피드백해주세요.",
-                        # "아래는 예시 질문과 답변, 그리고 그에 대한 피드백입니다."
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                "max_tokens": 512,
-                "temperature": 0.7,
-            },
-            timeout=30,
-        )
-
-        end_time = time.time()
-        elapsed = round(end_time - start_time, 2)
-        print(f"응답 시간: {elapsed}초")
-        response.raise_for_status()
-
-        return response.json()["choices"][0]["message"]["content"].strip()
-
-    except requests.exceptions.RequestException as e:
-        return f"피드백 생성 중 오류 발생: {str(e)}"
+    except aiohttp.ClientError as e:
+        raise RuntimeError(f"LLM API 요청 실패: {str(e)}")

@@ -1,5 +1,5 @@
+# app/routes/health.py
 from fastapi import APIRouter
-import requests
 
 router = APIRouter()
 
