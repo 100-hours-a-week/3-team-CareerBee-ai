@@ -6,9 +6,7 @@ from transformers import pipeline
 VLLM_URL = os.getenv("VLLM_URL", "http://localhost:8001")
 MODEL_NAME = "/mnt/ssd/aya-expanse-8b"
 
-classifier = pipeline(
-    "text-classification", model="beomi/KcELECTRA-base-toxic-comments"
-)
+classifier = pipeline("text-classification", model="smilegate-ai/kor_unsmile")
 
 
 def is_safe_with_model(text: str) -> bool:
