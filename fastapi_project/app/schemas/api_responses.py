@@ -21,16 +21,12 @@ class ResumeAgentInitResponse(BaseModel):
 
 
 class ResumeAgentUpdateResponse(BaseModel):
-    """이력서 에이전트 업데이트 응답 (FastAPI -> Spring)"""
-
     memberId: int = Field(..., description="회원 ID")
     isComplete: bool = Field(..., alias="isComplete", description="완료 여부")
-
-    # 추가 질문 있는 경우
-    question: Optional[str] = Field(default=None, description="다음 질문 (미완료시)")
-
-    # 완료된 경우
-    resumeObjectKey: Optional[str] = Field(
+    question: Optional[str] = Field(
+        default=None, description="다음 질문 (미완료시)"
+    )  # 추가 질문 있는 경우
+    resumeObjectKey: Optional[str] = Field(  # 완료된 경우
         default=None, description="S3 객체 키 (완료시)"
     )
 
@@ -70,7 +66,7 @@ class ResumeCreateData(BaseModel):
 
 
 class ResumeCreateResponse(BaseModel):
-    message: str = Field(..., description="resume_draft_success")  # e.g.
+    message: str = Field(..., description="resume_draft_success")
     data: ResumeCreateData = Field(..., description="응답 데이터")
 
 
