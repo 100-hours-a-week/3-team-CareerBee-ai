@@ -54,7 +54,7 @@ async def create_feedback(request: FeedbackRequest):
         )
 
     except ValueError as e:
-        # 비즈니스 로직 검증 실패
+        # 비즈니스 로직 검증 실패 (예: 안전하지 않은 피드백 응답 포함)
         logger.warning(f"비즈니스 로직 오류: {e}")
         return JSONResponse(
             status_code=400,
