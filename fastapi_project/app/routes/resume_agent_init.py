@@ -4,7 +4,7 @@
 """
 import traceback
 import logging
-import datetime
+from datetime import datetime
 
 
 from fastapi import APIRouter, HTTPException
