@@ -4,7 +4,7 @@ from datetime import datetime
 import asyncio
 from typing import Optional, Union
 from app.utils.llm_client import LLMClient, create_llm_client
-from app.schemas import ResumeAgentState, ResumeAgentUpdateRequest
+from app.schemas import ResumeAgentState
 from docx import Document
 from docx.shared import Pt
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT

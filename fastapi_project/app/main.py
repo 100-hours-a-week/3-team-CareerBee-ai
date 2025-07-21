@@ -13,7 +13,6 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
 from app.routes.resume_create import router as resume_create_router
-
 from app.routes.health import router as health_router
 from app.routes.resume_extract import router as resume_extract_router
 from app.routes.feedback import router as feedback_router
@@ -36,6 +35,8 @@ from pytz import timezone
 from dotenv import load_dotenv
 
 from prometheus_fastapi_instrumentator import Instrumentator
+from app.mcp import integrate_mcp_with_fastapi
+
 
 # ✅ 전역 로깅 설
 logging.basicConfig(
@@ -77,12 +78,20 @@ async def lifespan(app: FastAPI):
         timezone=timezone("Asia/Seoul"),
     )
     scheduler.start()
-
     app.state.scheduler = scheduler
+
+    # MCP 서버 시작
+    logger.info("MCP 서버 시작")
+    app.state.mcp_manager.start()
 
     yield
 
     logger.info("서버 종료")
+
+    # MCP 서버 종료
+    if hasattr(app.state, "mcp_manager"):
+        app.state.mcp_manager.stop()
+        logger.info("MCP 서버 종료")
 
     # 스케줄러 정리
     if hasattr(app.state, "scheduler"):
@@ -108,59 +117,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# # ✅ HTTP 예외 핸들러
-# @app.exception_handler(StarletteHTTPException)
-# async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-#     logger.warning(
-#         f"HTTP Exception: {exc.status_code} - {exc.detail} - "
-#         f"Path: {request.url.path} - Client: {request.client.host if request.client else 'unknown'}"
-#     )
-#     return JSONResponse(
-#         status_code=exc.status_code,
-#         content={
-#             "httpStatusCode": exc.status_code,
-#             "message": "HTTP 예외 발생",
-#             "detail": exc.detail,
-#         },
-#     )
-
-
-# # ✅ 요청 유효성 검증 실패 (422) 핸들러
-# @app.exception_handler(RequestValidationError)
-# async def validation_exception_handler(request: Request, exc: RequestValidationError):
-#     body = await request.body()
-#     logging.warning("❌ 422 요청 데이터 검증 실패")
-#     logging.warning(f"📦 요청 바디: {body.decode('utf-8')}")
-#     logging.warning(f"🔍 에러 상세: {exc.errors()}")
-
-#     return JSONResponse(
-#         status_code=422,
-#         content={
-#             "httpStatusCode": 422,
-#             "message": "요청 데이터 검증 실패",
-#             "detail": exc.errors(),
-#         },
-#     )
-
-
-# # ✅ 기타 예외 핸들러
-# @app.exception_handler(Exception)
-# async def generic_exception_handler(request: Request, exc: Exception):
-#     logger.error(
-#         f"Unhandled Exception: {type(exc).__name__} - {str(exc)} - "
-#         f"Path: {request.url.path} - Client: {request.client.host if request.client else 'unknown'}",
-#         exc_info=True,
-#     )
-#     traceback.print_exc()
-#     return JSONResponse(
-#         status_code=500,
-#         content={
-#             "httpStatusCode": 500,
-#             "message": "내부 서버 오류입니다.",
-#             "detail": str(exc),
-#         },
-#     )
+app.state.mcp_manager = integrate_mcp_with_fastapi(app)
 
 
 # 라우터 등록
