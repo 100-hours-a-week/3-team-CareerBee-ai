@@ -1,6 +1,6 @@
 # app/agents/nodes/check_completion.py
 from app.agents.base_node import BaseNode
-from app.schemas import ResumeAgentState, ResumeAgentUpdateRequest
+from app.schemas import ResumeAgentState
 
 
 class CheckCompletionNode(BaseNode):
