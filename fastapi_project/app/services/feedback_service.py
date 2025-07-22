@@ -1,89 +1,70 @@
 import os
-import requests
-import time
+import aiohttp
+import re
+from transformers import pipeline
 
 VLLM_URL = os.getenv("VLLM_URL", "http://localhost:8001")
 MODEL_NAME = "/mnt/ssd/aya-expanse-8b"
 
+classifier = pipeline("text-classification", model="smilegate-ai/kor_unsmile")
+
+
+def is_safe_with_model(text: str) -> bool:
+    predictions = classifier(text)
+    for pred in predictions:
+        if pred["label"] == "toxicity" and pred["score"] > 0.8:
+            return False
+    return True
+
 
 def build_feedback_prompt(question: str, answer: str) -> str:
-    few_shot_examples = [
-        # {
-        #     "question": "LSTM이 기울기 소실 문제를 해결하는 핵심 구조적 특징을 설명해주세요.",
-        #     "answer": "LSTM은 RNN보다 좋아서 기울기 소실이 안 생깁니다.",
-        #     "feedback": "피드백: LSTM이 RNN보다 개선된 점을 언급했지만, 질문의 핵심인 구조적 특징에 대한 설명이 없습니다. "
-        #     "LSTM은 셀 상태(cell state)와 게이트 메커니즘(입력 게이트, 삭제 게이트, 출력 게이트)을 통해 정보 흐름을 조절함으로써 기울기 소실 문제를 완화합니다. "
-        #     "이러한 핵심 구조에 대한 이해와 설명을 하면 더 좋은 답변이 될 것입니다.",
-        # },
-        # {
-        #     "question": "자바의 가비지 컬렉션과 어떤 차이점이 있을까요?",
-        #     "answer": "자바의 가비지 컬렉션은 자동 메모리 관리 시스템으로, 개발자가 명시적으로 메모리를 해제할 필요 없이 사용되지 않는 객체를 자동으로 제거합니다.  반면 C++은 가비지 컬렉션을 제공하지 않으며, 개발자가 `new` 연산자로 동적으로 할당한 메모리를 `delete` 연산자를 사용하여 수동으로 해제해야 합니다.  이러한 차이로 인해 자바는 메모리 관리에 대한 부담이 줄어들지만, 가비지 컬렉션의 오버헤드가 발생할 수 있으며, C++은 메모리 관리에 대한 세밀한 제어가 가능하지만, 메모리 누수나 메모리 접근 위험이 존재합니다.  결론적으로, 메모리 관리 방식의 차이는 개발 편의성과 성능, 안정성 측면에서 상호 트레이드오프 관계를 가지고 있습니다.",
-        #     "feedback": "피드백: 답변은 자바와 C++의 메모리 관리 차이점을 잘 설명했습니다.  자바의 자동 가비지 컬렉션과 C++의 수동 메모리 관리의 장단점을 명확하게 비교하여 트레이드오프 관계를 제시한 점이 좋습니다.\n\n하지만,  '가비지 컬렉션의 오버헤드'에 대한 설명이 추상적입니다.  어떤 종류의 오버헤드가 발생하는지 (예: 성능 저하, 일시적인 정지 등) 구체적으로 설명하고,  C++의 메모리 누수 및 메모리 접근 위험에 대한 예시를 추가하면 더욱 설득력 있는 답변이 됩니다.  또한,  다른 언어(예: Python, Go)의 가비지 컬렉션 방식과 비교하여 자바의 특징을 더욱 명확히 설명하면 좋습니다.",
-        # },
-        # {
-        #     "question": "LSTM이 기울기 소실 문제를 해결하는 핵심 구조적 특징을 설명해주세요.",
-        #     "answer": "LSTM은 셀 상태(cell state)를 유지하면서 정보를 장기간 보존할 수 있는 구조로, 기울기 소실 문제를 완화합니다. "
-        #     "특히 입력 게이트, 삭제 게이트, 출력 게이트로 구성된 게이트 메커니즘이 중요 정보를 선택적으로 전달하거나 차단하여 안정적인 역전파가 가능합니다.",
-        #     "feedback": "피드백: LSTM의 핵심 구조와 기울기 소실 완화 방식에 대해 정확히 설명했습니다. "
-        #     "특히 셀 상태 유지와 게이트 메커니즘의 기능을 명확히 짚은 점이 인상적입니다. "
-        #     "추가로, 왜 일반 RNN에서는 이러한 구조가 없는지 비교 관점에서 설명을 덧붙이면 더욱 설득력 있는 답변이 될 것입니다.",
-        # },
-    ]
-
-    few_shot_prompt = ""
-    for ex in few_shot_examples:
-        few_shot_prompt += (
-            f"[질문]\n{ex['question']}\n"
-            f"[답변]\n{ex['answer']}\n"
-            f"[피드백]\n{ex['feedback']}\n\n"
-        )
 
     user_prompt = (
         f"[질문]\n{question}\n"
         f"[답변]\n{answer}\n"
-        "이 답변에 대해 다음 기준을 바탕으로 간결하게 구체적인 피드백을 3~5문장으로 작성해주세요:\n"
-        "- 답변이 질문의 핵심을 이해하고 있는지\n"
-        "- 틀린 내용이나 부족한 설명이 있는지\n"
-        "- 어떤 내용을 보완하면 더 좋은 답변이 되는지\n"
-        "문장 도중에 끊지 말고, 의미 단위로 문장을 마무리한 뒤 출력을 종료해주세요.\n\n"
+        "**다음 기준에 따라 문체는 간결하게, 문장 도중에 끊기지 않도록 의미 단위로 마무리해 주세요.**\n"
+        "답변은 항상 정중하고 전문적인 언어를 사용해야 하며, 비하, 모욕, 차별적 표현은 절대 포함하지 마세요.\n"
+        "전체 피드백은 한글 기준 띄어쓰기 포함 450자 이내여야 하며, 다음 형식을 참고해 주세요: \n\n"
+        "프록시 서버의 개념을 이해하고 있으나 몇 가지 핵심 설명이 빠져 있습니다.\n"
+        "**긍정적인 점:**\n- 중개자 역할을 인지하고 있음\n"
+        "**보완할 점:**\n- 보안 외의 주요 기능 예시 부족, 구체적인 사용 사례 추가 필요\n\n"
+        "위와 같이 자연스러운 글 형태로 피드백을 작성하세요. '답변 분석:', '피드백:' 같은 표현은 생략해주세요.\n\n"
         "피드백:"
     )
 
-    return f"{few_shot_prompt}" f"{user_prompt}"
+    return f"{user_prompt}"
 
 
-def generate_feedback(question: str, answer: str) -> str:
+async def generate_feedback(question: str, answer: str) -> str:
     prompt = build_feedback_prompt(question, answer)
 
     try:
         print("VLLM_URL:", VLLM_URL)
-        start_time = time.time()
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=30)
+        ) as session:
+            async with session.post(
+                url=f"{VLLM_URL}/v1/chat/completions",
+                json={
+                    "model": MODEL_NAME,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "당신은 컴퓨터공학 전문가이며, 컴퓨터공학 관련 질문에 대한 답변을 평가하고 개선 방향을 제안하는 역할을 합니다. 답변이 핵심을 잘 짚었는지, 부족하거나 부정확한 점은 없는지 파악한 후, 문장 도중 끊김 없이 자연스럽고 간결한 문체로 피드백을 작성하세요. '피드백:'이나 '분석:' 같은 메타 표현은 쓰지 말고, 긍정적인 점과 보완할 점을 구분해 작성하면 좋습니다. 피드백은 한글 기준 450자 이내여야 합니다.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    "max_tokens": 350,
+                    "temperature": 0.7,
+                },
+                headers={"Content-Type": "application/json"},
+            ) as response:
+                response.raise_for_status()
+                result = await response.json()
+                repsonse_text = result["choices"][0]["message"]["content"].strip()
+                if not is_safe_with_model(repsonse_text):
+                    raise ValueError("안전하지 않은 응답이 감지되었습니다.")
+                return repsonse_text
 
-        response = requests.post(
-            f"{VLLM_URL}/v1/chat/completions",
-            headers={"Content-Type": "application/json"},
-            json={
-                "model": MODEL_NAME,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "당신은 컴퓨터공학 면접관입니다. 당신이 질문한 컴퓨터공학 개념에 대해 지원자의 답변을 보고 어떤 점이 보완되면 좋겠는지 친절하게 피드백해주세요.",
-                        # "아래는 예시 질문과 답변, 그리고 그에 대한 피드백입니다."
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                "max_tokens": 512,
-                "temperature": 0.7,
-            },
-            timeout=30,
-        )
-
-        end_time = time.time()
-        elapsed = round(end_time - start_time, 2)
-        print(f"응답 시간: {elapsed}초")
-        response.raise_for_status()
-
-        return response.json()["choices"][0]["message"]["content"].strip()
-
-    except requests.exceptions.RequestException as e:
-        return f"피드백 생성 중 오류 발생: {str(e)}"
+    except aiohttp.ClientError as e:
+        raise RuntimeError(f"LLM API 요청 실패: {str(e)}")

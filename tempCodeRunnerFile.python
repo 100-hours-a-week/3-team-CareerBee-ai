@@ -1,0 +1,17 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# 시간 도메인: 2개의 사인파가 섞인 신호
+t = np.linspace(0, 1, 500)
+signal = np.sin(2 * np.pi * 5 * t) + 0.5 * np.sin(2 * np.pi * 20 * t)
+
+# FFT 적용
+fft_result = np.fft.fft(signal)
+freq = np.fft.fftfreq(len(t), d=(t[1]-t[0]))
+
+# 주파수 도메인 출력
+plt.plot(freq[:250], np.abs(fft_result[:250]))
+plt.title("Frequency domain (FFT)")
+plt.xlabel("Frequency (Hz)")
+plt.ylabel("Amplitude")
+plt.show()
