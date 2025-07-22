@@ -74,7 +74,7 @@ class LLMClient:
             self.logger.debug(f"VLLM 호출: {self.vllm_url}")
 
             async with aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=60)
+                timeout=aiohttp.ClientTimeout(total=300)
             ) as session:
                 async with session.post(
                     url=f"{self.vllm_url}/v1/chat/completions",
