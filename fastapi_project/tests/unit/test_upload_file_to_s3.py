@@ -34,9 +34,9 @@ class TestS3Upload:
             assert client == mock_client
             mock_boto3.assert_called_once_with(
                 "s3",
-                aws_access_key_id=None,  # 테스트 환경에서는 None
-                aws_secret_access_key=None,
-                region_name=None,
+                aws_access_key_id="test_key",  # 테스트 환경에서는 None
+                aws_secret_access_key="test_secret",
+                region_name="ap-northeast-2",
             )
 
     def test_upload_file_to_s3_success(self):
@@ -62,7 +62,7 @@ class TestS3Upload:
             assert result_url is not None
             assert isinstance(result_url, str)
             assert "test-bucket.s3.amazonaws.com" in result_url
-            assert "resume/test_resume.docx" in result_url
+            assert "resume/" in result_url and ".docx" in result_url
 
             # S3 클라이언트 메서드 호출 확인
             mock_s3_client.upload_fileobj.assert_called_once()

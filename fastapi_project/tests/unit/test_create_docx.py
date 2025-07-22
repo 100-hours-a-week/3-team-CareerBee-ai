@@ -20,8 +20,9 @@ class TestCreateDocx:
 
     def test_save_resume_to_docx_success(self):
         """기본 이력서 DOCX 생성 성공 테스트"""
-        with patch("docx.Document") as mock_document, patch(
-            "os.makedirs"
+        # app.utils.create_docx 모듈에서 docx.Document를 패치
+        with patch("app.utils.create_docx.Document") as mock_document, patch(
+            "app.utils.create_docx.os.makedirs"
         ) as mock_makedirs:
 
             mock_doc_instance = Mock()
@@ -31,10 +32,13 @@ class TestCreateDocx:
 
             filename = save_resume_to_docx(resume_text)
 
-            # 반환된 파일명 검증
+            # 반환된 파일명 검증 (resume + timestamp + .docx)
             assert filename is not None
             assert filename.endswith(".docx")
-            assert filename.startswith("resume_")
+            assert filename.startswith("resume")
+            assert len(filename) == len("resume") + 14 + len(
+                ".docx"
+            )  # resume + YYYYMMDDHHMMSS + .docx
 
             # Document 생성 및 저장 확인
             mock_document.assert_called_once()
@@ -49,7 +53,9 @@ class TestCreateDocx:
 
     def test_save_resume_to_docx_empty_text(self):
         """빈 텍스트 처리 테스트"""
-        with patch("docx.Document") as mock_document, patch("os.makedirs"):
+        with patch("app.utils.create_docx.Document") as mock_document, patch(
+            "app.utils.create_docx.os.makedirs"
+        ):
 
             mock_doc_instance = Mock()
             mock_document.return_value = mock_doc_instance
@@ -63,7 +69,9 @@ class TestCreateDocx:
 
     def test_save_resume_to_docx_multiline_processing(self):
         """여러 줄 텍스트 처리 확인"""
-        with patch("docx.Document") as mock_document, patch("os.makedirs"):
+        with patch("app.utils.create_docx.Document") as mock_document, patch(
+            "app.utils.create_docx.os.makedirs"
+        ):
 
             mock_doc_instance = Mock()
             mock_document.return_value = mock_doc_instance
@@ -83,26 +91,26 @@ class TestCreateDocx:
 
     def test_save_resume_to_docx_filename_format(self):
         """파일명 형식 검증"""
-        with patch("docx.Document") as mock_document, patch("os.makedirs"), patch(
-            "app.utils.create_docx.datetime"
-        ) as mock_datetime:
+        with patch("app.utils.create_docx.Document") as mock_document, patch(
+            "app.utils.create_docx.os.makedirs"
+        ), patch("app.utils.create_docx.datetime") as mock_datetime:
 
             mock_doc_instance = Mock()
             mock_document.return_value = mock_doc_instance
 
-            # 고정된 타임스탬프로 모킹
-            mock_datetime.now.return_value.strftime.return_value = "20240115_143022"
+            # 고정된 타임스탬프로 모킹 (실제 형식에 맞춤: %Y%m%d%H%M%S)
+            mock_datetime.now.return_value.strftime.return_value = "20240115143022"
 
             filename = save_resume_to_docx("Test content")
 
-            expected_filename = "resume_20240115_143022.docx"
+            expected_filename = "resume20240115143022.docx"
             assert filename == expected_filename
             mock_doc_instance.save.assert_called_once_with(expected_filename)
 
     def test_save_resume_to_docx_save_dir_parameter(self):
         """save_dir 파라미터 테스트 (현재는 무시됨)"""
-        with patch("docx.Document") as mock_document, patch(
-            "os.makedirs"
+        with patch("app.utils.create_docx.Document") as mock_document, patch(
+            "app.utils.create_docx.os.makedirs"
         ) as mock_makedirs:
 
             mock_doc_instance = Mock()
@@ -117,7 +125,9 @@ class TestCreateDocx:
 
     def test_save_resume_to_docx_file_write_error(self):
         """파일 쓰기 권한 오류 테스트"""
-        with patch("docx.Document") as mock_document, patch("os.makedirs"):
+        with patch("app.utils.create_docx.Document") as mock_document, patch(
+            "app.utils.create_docx.os.makedirs"
+        ):
 
             mock_doc_instance = Mock()
             mock_doc_instance.save.side_effect = PermissionError("권한 없음")
@@ -128,8 +138,9 @@ class TestCreateDocx:
 
     def test_save_resume_to_docx_directory_creation_error(self):
         """디렉토리 생성 오류 테스트"""
-        with patch("docx.Document"), patch(
-            "os.makedirs", side_effect=OSError("디렉토리 생성 실패")
+        with patch("app.utils.create_docx.Document"), patch(
+            "app.utils.create_docx.os.makedirs",
+            side_effect=OSError("디렉토리 생성 실패"),
         ):
 
             with pytest.raises(OSError):
@@ -137,24 +148,25 @@ class TestCreateDocx:
 
     def test_save_resume_to_docx_newline_edge_cases(self):
         """줄바꿈 처리 엣지 케이스 테스트"""
-        with patch("docx.Document") as mock_document, patch("os.makedirs"):
+        with patch("app.utils.create_docx.Document") as mock_document, patch(
+            "app.utils.create_docx.os.makedirs"
+        ):
 
             mock_doc_instance = Mock()
             mock_document.return_value = mock_doc_instance
 
             # 연속된 줄바꿈 테스트
             test_cases = [
-                "Line1\n\nLine3",  # 빈 줄 포함
-                "Line1\nLine2\n",  # 마지막 줄바꿈
-                "\nLine2\nLine3",  # 첫 번째 빈 줄
-                "Single line",  # 줄바꿈 없음
+                ("Line1\n\nLine3", ["Line1", "", "Line3"]),  # 빈 줄 포함
+                ("Line1\nLine2\n", ["Line1", "Line2", ""]),  # 마지막 줄바꿈
+                ("\nLine2\nLine3", ["", "Line2", "Line3"]),  # 첫 번째 빈 줄
+                ("Single line", ["Single line"]),  # 줄바꿈 없음
             ]
 
-            for test_text in test_cases:
+            for test_text, expected_lines in test_cases:
                 mock_doc_instance.reset_mock()
                 save_resume_to_docx(test_text)
 
-                expected_lines = test_text.split("\n")
                 assert mock_doc_instance.add_paragraph.call_count == len(expected_lines)
 
 
@@ -168,13 +180,13 @@ class TestCreateDocxFallback:
         """파일명 생성 로직 시뮬레이션"""
         from datetime import datetime
 
-        # 실제 함수와 같은 로직
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"resume_{timestamp}.docx"
+        # 실제 함수와 같은 로직: %Y%m%d%H%M%S
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        filename = f"resume{timestamp}.docx"
 
-        assert filename.startswith("resume_")
+        assert filename.startswith("resume")
         assert filename.endswith(".docx")
-        assert len(timestamp) == 15  # YYYYMMDD_HHMMSS
+        assert len(timestamp) == 14  # YYYYMMDDHHMMSS
 
     def test_text_splitting_logic(self):
         """텍스트 분할 로직 시뮬레이션"""

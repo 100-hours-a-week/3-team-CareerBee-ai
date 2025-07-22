@@ -24,6 +24,66 @@ except ImportError:
 class TestResumeCreateService:
     """이력서 생성 서비스 단위 테스트"""
 
+    def test_validate_resume_data_negative_counts(self, resume_request_data):
+        """음수 값 검증 테스트 - 올바른 예외 처리"""
+        # project_count를 음수로 설정
+        resume_request_data["project_count"] = -1
+
+        # Pydantic 검증 오류가 발생해야 함
+        with pytest.raises(
+            ValueError, match="Input should be greater than or equal to 0"
+        ):
+            request = ResumeCreateRequest(**resume_request_data)
+
+        # 또는 더 구체적으로 pydantic_core.ValidationError를 잡을 수 있음
+        from pydantic_core import ValidationError
+
+        with pytest.raises(ValidationError) as exc_info:
+            request = ResumeCreateRequest(**resume_request_data)
+
+        # 검증 오류 내용 확인
+        error = exc_info.value
+        assert len(error.errors()) > 0
+        assert error.errors()[0]["type"] == "greater_than_equal"
+        assert error.errors()[0]["loc"] == ("project_count",)
+
+    def test_validate_resume_data_boundary_values(self, resume_request_data):
+        """경계값 테스트 - 0은 유효해야 함"""
+        # 0 값들은 유효해야 함 (ge=0 조건)
+        resume_request_data.update(
+            {"project_count": 0, "certification_count": 0, "work_period": 0}
+        )
+
+        # 이것은 성공해야 함
+        request = ResumeCreateRequest(**resume_request_data)
+        assert request.project_count == 0
+        assert request.certification_count == 0
+        assert request.work_period == 0
+
+    def test_validate_resume_data_multiple_negative_values(self):
+        """여러 음수 값 검증 테스트"""
+        invalid_data = {
+            "email": "test@example.com",
+            "preferred_job": "개발자",
+            "major_type": "MAJOR",
+            "project_count": -1,
+            "certification_count": -2,
+            "work_period": -5,
+        }
+
+        from pydantic_core import ValidationError
+
+        with pytest.raises(ValidationError) as exc_info:
+            request = ResumeCreateRequest(**invalid_data)
+
+        # 여러 필드 오류 확인
+        errors = exc_info.value.errors()
+        error_fields = [error["loc"][0] for error in errors]
+
+        assert "project_count" in error_fields
+        assert "certification_count" in error_fields
+        assert "work_period" in error_fields
+
     @pytest.fixture
     def resume_request_data(self):
         """ResumeCreateRequest 객체 생성용 fixture"""
@@ -59,15 +119,6 @@ class TestResumeCreateService:
     def test_validate_resume_data_empty_job(self, resume_request_data):
         """빈 직무 검증 테스트"""
         resume_request_data["preferred_job"] = ""
-        request = ResumeCreateRequest(**resume_request_data)
-
-        result = validate_resume_data(request)
-
-        assert result == False
-
-    def test_validate_resume_data_negative_counts(self, resume_request_data):
-        """음수 개수 검증 테스트"""
-        resume_request_data["project_count"] = -1
         request = ResumeCreateRequest(**resume_request_data)
 
         result = validate_resume_data(request)
@@ -358,7 +409,7 @@ class TestResumeCreateServiceFallback:
         invalid_data = {
             "email": "invalid-email",
             "preferred_job": "",
-            "project_count": -1,
+            "project_count": 0,  # 음수 테스트는 별도로
         }
         assert mock_validate_data(invalid_data) == False
 
