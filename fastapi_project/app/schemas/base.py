@@ -17,10 +17,10 @@ class BaseInputsModel(BaseModel):
     certification_count: int = Field(default=0, ge=0, description="자격증 개수")
     project_count: int = Field(default=0, ge=0, description="프로젝트 개수")
     major_type: Literal["MAJOR", "NON_MAJOR"] = Field(..., description="전공 유형")
-    company_name: str = Field(default="", description="회사명")
-    position: str = Field(default="", description="직책")
-    work_period: int = Field(default=0, ge=0, description="근무 기간 (개월)")
-    additional_experiences: str = Field(
+    company_name: Optional[str] = Field(default="", description="회사명")
+    position: Optional[str] = Field(default="", description="직책")
+    work_period: Optional[int] = Field(default=0, ge=0, description="근무 기간 (개월)")
+    additional_experiences: Optional[str] = Field(
         default="", description="추가 경험사항"
     )  # 오타 수정: dafault -> default
 

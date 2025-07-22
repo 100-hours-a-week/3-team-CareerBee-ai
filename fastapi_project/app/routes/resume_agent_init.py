@@ -4,6 +4,8 @@
 """
 import traceback
 import logging
+from datetime import datetime
+
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
@@ -47,27 +49,18 @@ async def initialize_resume_agent(payload: ResumeAgentInitRequest):
     4. 새로운 형식 응답 반환 (memberId + question)
     """
     memberId = payload.memberId
-
+    # 요청 입력값 로깅
+    logger.info(f"=== 초기화 요청 ===")
+    logger.info(f"memberId: {memberId}")
+    logger.info(f"inputs: {payload.inputs}")
+    logger.info(f"timestamp: {datetime.now()}")
     try:
         logger.info(f"이력서 에이전트 초기화 요청: memberId={memberId}")
 
         # 1. 기존 상태 확인 및 정리
-        existing_state = await redis_client.load_state(memberId)
-        if existing_state:
-            logger.warning(f"기존 진행 중인 세션 발견: memberId={memberId}")
-
-            # 기존 질문이 있고 완료되지 않았다면 기존 질문 반환
-            if existing_state.pending_questions and not existing_state.is_complete():
-                response_data = {
-                    "memberId": memberId,
-                    "question": existing_state.pending_questions[0],
-                }
-                logger.info(f"기존 세션 질문 반환: memberId={memberId}")
-                return JSONResponse(content=response_data)
-
-            # 완료되었거나 문제가 있다면 새로 시작
-            await redis_client.delete_state(memberId)
-            logger.info(f"기존 세션 정리 완료: memberId={memberId}")
+        existing_deleted = await redis_client.delete_state(memberId)
+        if existing_deleted:
+            logger.warning(f"기존 세션 삭제 완료: memberId={memberId}")
 
         # 2. 새로운 초기 상태 생성
         initial_state = create_initial_state(memberId=memberId, inputs=payload.inputs)
@@ -227,3 +220,36 @@ async def agent_health_check():
         return JSONResponse(
             status_code=500, content={"agent_status": "unhealthy", "error": str(e)}
         )
+
+
+@router.post(
+    "/resume/agent/reset",
+    summary="에이전트 상태 초기화 (Redis 삭제)",
+    description="memberId에 해당하는 Redis 상태를 삭제하여 세션을 초기화합니다. 테스트용으로 사용하세요.",
+    tags=["ResumeAgent"],
+)
+async def reset_agent_session(memberId: int):
+    """
+    특정 memberId에 대한 에이전트 세션 상태 초기화 (Redis 삭제)
+
+    사용 예:
+    POST /resume/agent/reset?memberId=3
+    """
+    try:
+        deleted = await redis_client.delete_state(memberId)
+
+        return JSONResponse(
+            content={
+                "memberId": memberId,
+                "deleted": deleted,
+                "message": (
+                    "세션 상태가 초기화되었습니다."
+                    if deleted
+                    else "삭제할 세션이 없습니다."
+                ),
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"세션 초기화 실패: memberId={memberId}, error={str(e)}")
+        raise HTTPException(status_code=500, detail=f"세션 초기화 실패: {str(e)}")

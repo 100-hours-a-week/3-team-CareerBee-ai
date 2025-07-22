@@ -337,6 +337,7 @@ class RedisClient:
                         "used_memory": info.get("used_memory_human", "unknown"),
                         "connected_clients": info.get("connected_clients", 0),
                         "uptime_in_seconds": info.get("uptime_in_seconds", 0),
+                        # "key_count": info.get("dbsize", 0),
                     }
                 except:
                     pass
