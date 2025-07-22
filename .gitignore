@@ -1,3 +1,11 @@
+# mcp 관련
+
+app/mcp/__init__.py
+app/mcp/mcp_integration.py
+app/mcp/mcp_server.py
+scripts/
+tests/
+!scripts/report_loader.py
 
 # Python
 __pycache__/
