@@ -49,7 +49,7 @@ prompt = ChatPromptTemplate.from_messages([
 ])
 
 # 3. 모델 정의 (환경변수 사용)
-vllm_url = os.getenv("VLLM_URL", "http://localhost:8001/v1")
+vllm_url = os.getenv("VLLM_URL", "http://vllm:8001/v1")
 
 llm = ChatOpenAI(
     model="/mnt/ssd/aya-expanse-8b",
