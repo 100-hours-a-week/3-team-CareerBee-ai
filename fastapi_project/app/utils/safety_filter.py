@@ -29,7 +29,7 @@ class SafetyFilterError(Exception):
     pass
 
 
-def is_toxic(text: str, threshold: float = 0.8) -> Tuple[bool, Dict[str, float]]:
+def is_toxic(text: str, threshold: float = 0.95) -> Tuple[bool, Dict[str, float]]:
     """
     텍스트의 유해성을 검사합니다.
 
