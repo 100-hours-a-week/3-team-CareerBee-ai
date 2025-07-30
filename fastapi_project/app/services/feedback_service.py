@@ -1,108 +1,14 @@
+# app/services/feedback_service.py (또는 해당 파일명)
 import os
 import aiohttp
-import re
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
-import torch
-from typing import Tuple, Dict, List
 import logging
+from app.utils.safety_filter import is_toxic, validate_input, SafetyFilterError
+from typing import Tuple, Dict
 
-# 로깅 설정
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 VLLM_URL = os.getenv("VLLM_URL", "http://localhost:8001")
-MODEL_NAME = "/mnt/ssd/aya-expanse-8b"
-
-# safety model 초기화
-tokenizer = AutoTokenizer.from_pretrained("smilegate-ai/kor_unsmile")
-model = AutoModelForSequenceClassification.from_pretrained("smilegate-ai/kor_unsmile")
-
-labels = [
-    "none",
-    "gender",
-    "others",
-    "origin",
-    "religion",
-    "age",
-    "race",
-    "disability",
-    "sexual_orientaion",
-    "nationality",
-]
-
-classifier = pipeline("text-classification", model="smilegate-ai/kor_unsmile")
-
-
-class SafetyFilterError(Exception):
-    """안전성 필터 관련 에러"""
-
-    pass
-
-
-def is_toxic(text: str, threshold: float = 0.8) -> Tuple[bool, Dict[str, float]]:
-    """텍스트의 유해성을 검사합니다.
-
-    Args:
-        text: 검사할 텍스트
-        threshold: 유해성 판단 임계값
-
-    Returns:
-        (is_toxic, scores): 유해성 여부와 각 라벨별 점수
-    """
-    try:
-        inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
-        with torch.no_grad():
-            logits = model(**inputs).logits
-            probs = torch.sigmoid(logits)[0]
-
-        scores = {}
-        toxic_labels = []
-
-        for label, score in zip(labels, probs):
-            score_value = score.item()
-            scores[label] = score_value
-
-            if label != "none" and score_value > threshold:
-                toxic_labels.append((label, score_value))
-
-        is_toxic_result = len(toxic_labels) > 0
-
-        if is_toxic_result:
-            logger.warning(f"유해 콘텐츠 감지: {toxic_labels}")
-
-        return is_toxic_result, scores
-
-    except Exception as e:
-        logger.error(f"유해성 검사 중 오류 발생: {str(e)}")
-        # 오류 발생 시 안전을 위해 유해하다고 판단
-        return True, {}
-
-
-def validate_input(question: str, answer: str) -> None:
-    """사용자 입력의 안전성을 검증합니다.
-
-    Args:
-        question: 면접 질문
-        answer: 사용자 답변
-
-    Raises:
-        SafetyFilterError: 유해한 내용이 감지된 경우
-    """
-    # 질문 검증
-    is_question_toxic, question_scores = is_toxic(question)
-    if is_question_toxic:
-        raise SafetyFilterError(
-            "질문에 부적절한 내용이 포함되어 있습니다. "
-            "다른 질문으로 다시 시도해 주세요."
-        )
-
-    # 답변 검증
-    is_answer_toxic, answer_scores = is_toxic(answer)
-    if is_answer_toxic:
-        raise SafetyFilterError(
-            "답변에 부적절한 내용이 포함되어 있습니다. "
-            "답변을 수정한 후 다시 시도해 주세요."
-        )
+MODEL_NAME = os.getenv("MODEL_NAME", "CohereLabs/aya-expanse-8b")
 
 
 def build_feedback_prompt(question: str, answer: str) -> str:
@@ -132,7 +38,7 @@ async def generate_feedback(question: str, answer: str) -> str:
         SafetyFilterError: 안전성 검증 실패
         RuntimeError: API 요청 실패
     """
-    # 1. 입력 안전성 검증
+    # 1. 입력 안전성 검증 (safety_filter 모듈 사용)
     try:
         validate_input(question, answer)
     except SafetyFilterError as e:
@@ -167,7 +73,8 @@ async def generate_feedback(question: str, answer: str) -> str:
                 response.raise_for_status()
                 result = await response.json()
                 response_text = result["choices"][0]["message"]["content"].strip()
-                # 4. 응답 안전성 검증
+
+                # 4. 응답 안전성 검증 (safety_filter 모듈 사용)
                 is_response_toxic, response_scores = is_toxic(response_text)
                 if is_response_toxic:
                     logger.error("생성된 피드백에 부적절한 내용이 포함되어 있습니다.")
@@ -176,6 +83,7 @@ async def generate_feedback(question: str, answer: str) -> str:
                         "죄송합니다. 적절한 피드백을 생성하는 데 문제가 발생했습니다. "
                         "다시 시도해주세요."
                     )
+
                 logger.info("피드백 생성 완료")
                 return response_text
 
